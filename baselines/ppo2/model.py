@@ -28,8 +28,9 @@ class Model(object):
                 nsteps, ent_coef, vf_coef, max_grad_norm, scope, microbatch_size=None):
         
         self.sess = sess = get_session()
+        self.scope = scope + '/' if scope else ''
 
-        with tf.variable_scope(scope + '/ppo2_model', reuse=tf.AUTO_REUSE):
+        with tf.variable_scope(self.scope + 'ppo2_model', reuse=tf.AUTO_REUSE):
             # CREATE OUR TWO MODELS
             # act_model that is used for sampling
             act_model = policy(nbatch_act, 1, sess)
@@ -92,7 +93,7 @@ class Model(object):
         # 1. Get the model parameters
         params = tf.trainable_variables(scope + '/ppo2_model')
         # 2. Build our trainer
-        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+        with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
             if MPI is not None:
                 self.trainer = MpiAdamOptimizer(MPI.COMM_WORLD, learning_rate=LR, epsilon=1e-5)
             else:
