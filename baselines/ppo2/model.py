@@ -91,7 +91,7 @@ class Model(object):
 
         # UPDATE THE PARAMETERS USING LOSS
         # 1. Get the model parameters
-        params = tf.trainable_variables(scope + '/ppo2_model')
+        params = tf.trainable_variables(self.scope + 'ppo2_model')
         # 2. Build our trainer
         with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
             if MPI is not None:
