@@ -121,8 +121,11 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
     # Start total timer
     tfirststart = time.time()
 
+    best_len_mean = np.Inf
+
     run_info = {'eprewmean': [], 'eplenmean': []}
     nupdates = total_timesteps//nbatch
+    print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
         assert nbatch % nminibatches == 0
         # Start timer
@@ -136,6 +139,12 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
         if eval_env is not None:
             eval_obs, eval_returns, eval_masks, eval_actions, eval_values, eval_neglogpacs, eval_states, eval_epinfos = eval_runner.run() #pylint: disable=E0632
+
+        eplenmean = safemean([epinfo['l'] for epinfo in epinfos])
+        if eplenmean < best_len_mean:
+            best_len_mean = eplenmean
+            model.save(".temp_best_model")
+            print("Saved model as best", eplenmean)
 
         epinfobuf.extend(epinfos)
         if eval_env is not None:
@@ -207,6 +216,10 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
             savepath = osp.join(checkdir, '%.5i'%update)
             print('Saving to', savepath)
             model.save(savepath)
+
+    if nupdates > 0:
+        print("loaded best model", best_len_mean)
+        model.load(".temp_best_model")
     return model, run_info
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
 def safemean(xs):
