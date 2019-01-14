@@ -121,7 +121,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
     # Start total timer
     tfirststart = time.time()
 
-    best_len_mean = np.Inf
+    best_rew_per_step = 0
 
     run_info = {'eprewmean': [], 'eplenmean': []}
     nupdates = total_timesteps//nbatch
@@ -136,15 +136,23 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         # Calculate the cliprange
         cliprangenow = cliprange(frac)
         # Get minibatch
+        start_time = time.time()
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
+        taken = time.time() - start_time
+        print("Took {} seconds to generate {} steps, {} s/second".format(taken, nbatch, nbatch / taken))
         if eval_env is not None:
             eval_obs, eval_returns, eval_masks, eval_actions, eval_values, eval_neglogpacs, eval_states, eval_epinfos = eval_runner.run() #pylint: disable=E0632
 
         eplenmean = safemean([epinfo['l'] for epinfo in epinfos])
-        if eplenmean < best_len_mean:
-            best_len_mean = eplenmean
+        eprewmean = safemean([epinfo['r'] for epinfo in epinfos])
+        rew_per_step = eprewmean / eplenmean
+
+        print("Curr reward per step", rew_per_step)
+
+        if rew_per_step > best_rew_per_step:
+            best_rew_per_step = eprewmean / eplenmean
             model.save(".temp_best_model")
-            print("Saved model as best", eplenmean)
+            print("Saved model as best", best_rew_per_step, "avg rew/step")
 
         epinfobuf.extend(epinfos)
         if eval_env is not None:
@@ -165,6 +173,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
                     mbinds = inds[start:end]
                     slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
                     mblossvals.append(model.train(lrnow, cliprangenow, *slices))
+                    # TODO: could look into assessing size of gradients
         else: # recurrent version
             assert nenvs % nminibatches == 0
             envsperbatch = nenvs // nminibatches
@@ -218,7 +227,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
             model.save(savepath)
 
     if nupdates > 0:
-        print("loaded best model", best_len_mean)
+        print("Loaded best model", best_rew_per_step)
         model.load(".temp_best_model")
     return model, run_info
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
