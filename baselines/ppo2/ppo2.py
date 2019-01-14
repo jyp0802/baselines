@@ -151,7 +151,9 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
 
         if rew_per_step > best_rew_per_step:
             best_rew_per_step = eprewmean / eplenmean
-            model.save(".temp_best_model")
+            checkdir = osp.join(logger.get_dir(), 'checkpoints')
+            print(checkdir)
+            model.save(checkdir + ".temp_best_model")
             print("Saved model as best", best_rew_per_step, "avg rew/step")
 
         epinfobuf.extend(epinfos)
@@ -227,8 +229,9 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
             model.save(savepath)
 
     if nupdates > 0:
+        checkdir = osp.join(logger.get_dir(), 'checkpoints')
         print("Loaded best model", best_rew_per_step)
-        model.load(".temp_best_model")
+        model.load(checkdir + ".temp_best_model")
     return model, run_info
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
 def safemean(xs):
