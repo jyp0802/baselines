@@ -23,6 +23,11 @@ class Runner(AbstractEnvRunner):
         mb_states = self.states
         epinfos = []
         # For n in range number of steps
+
+        import time
+        tot_time = time.time()
+        int_time = 0
+
         for _ in range(self.nsteps):
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
@@ -33,6 +38,12 @@ class Runner(AbstractEnvRunner):
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
 
+            partial = time.time()
+            observations = [switch_player(o) for o in self.obs]
+            other_agent_actions = self.env.other_agent.direct_action(observations)
+            actions = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
+            int_time += (time.time() - partial)
+
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
             self.obs[:], rewards, self.dones, infos = self.env.step(actions)
@@ -40,6 +51,10 @@ class Runner(AbstractEnvRunner):
                 maybeepinfo = info.get('episode')
                 if maybeepinfo: epinfos.append(maybeepinfo)
             mb_rewards.append(rewards)
+
+        tot_time = time.time() - tot_time
+        print("Total simulation time for {} steps: {} \t Other agent action time: {} \t {} steps/s".format(self.nsteps, tot_time, int_time, self.nsteps / tot_time)
+        
         #batch of steps to batch of rollouts
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
@@ -74,3 +89,20 @@ def sf01(arr):
     return arr.swapaxes(0, 1).reshape(s[0] * s[1], *s[2:])
 
 
+
+def switch_player(obs):
+    assert len(obs.shape) == 3
+    obs = obs.copy()
+    obs = switch_layers(obs, 0, 1)
+    obs = switch_layers(obs, 2, 6)
+    obs = switch_layers(obs, 3, 7)
+    obs = switch_layers(obs, 4, 8)
+    obs = switch_layers(obs, 5, 9)
+    return obs
+
+def switch_layers(obs, idx0, idx1):
+    obs = obs.copy()
+    tmp = obs[:,:,idx0].copy()
+    obs[:,:,idx0] = obs[:,:,idx1]
+    obs[:,:,idx1] = tmp
+    return obs

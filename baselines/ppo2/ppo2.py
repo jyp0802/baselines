@@ -18,7 +18,7 @@ def constfn(val):
         return val
     return f
 
-def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2048, ent_coef=0.0, lr=3e-4,
+def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = None, seed=None, nsteps=2048, ent_coef=0.0, lr=3e-4,
             vf_coef=0.5,  max_grad_norm=0.5, gamma=0.99, lam=0.95,
             log_interval=10, nminibatches=4, noptepochs=4, cliprange=0.2,
             save_interval=0, load_path=None, model_fn=None, scope='', **network_kwargs):
@@ -136,10 +136,8 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
         # Calculate the cliprange
         cliprangenow = cliprange(frac)
         # Get minibatch
-        start_time = time.time()
         obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run() #pylint: disable=E0632
-        taken = time.time() - start_time
-        print("Took {} seconds to generate {} steps, {} s/second".format(taken, nbatch, nbatch / taken))
+        
         if eval_env is not None:
             eval_obs, eval_returns, eval_masks, eval_actions, eval_values, eval_neglogpacs, eval_states, eval_epinfos = eval_runner.run() #pylint: disable=E0632
 
@@ -149,10 +147,11 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
 
         print("Curr reward per step", rew_per_step)
 
-        if rew_per_step > best_rew_per_step:
+        if rew_per_step > best_rew_per_step and early_stopping:
+            # Avoid updating best model at first iteration because the means might be a bit off because
+            # of how the multithreaded batch simulation works
             best_rew_per_step = eprewmean / eplenmean
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
-            print(checkdir)
             model.save(checkdir + ".temp_best_model")
             print("Saved model as best", best_rew_per_step, "avg rew/step")
 
@@ -228,7 +227,7 @@ def learn(*, network, env, total_timesteps, eval_env = None, seed=None, nsteps=2
             print('Saving to', savepath)
             model.save(savepath)
 
-    if nupdates > 0:
+    if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')
         print("Loaded best model", best_rew_per_step)
         model.load(checkdir + ".temp_best_model")
