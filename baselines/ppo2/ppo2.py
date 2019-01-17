@@ -1,5 +1,5 @@
 import os
-import time
+import time, tqdm
 import numpy as np
 import os.path as osp
 from baselines import logger
@@ -169,7 +169,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 # Randomize the indexes
                 np.random.shuffle(inds)
                 # 0 to batch_size with batch_train_size step
-                for start in range(0, nbatch, nbatch_train):
+                for start in tqdm.trange(0, nbatch, nbatch_train, desc="{}/{}".format(_, noptepochs)):
                     end = start + nbatch_train
                     mbinds = inds[start:end]
                     slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
