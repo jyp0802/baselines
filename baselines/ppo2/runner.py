@@ -29,6 +29,22 @@ class Runner(AbstractEnvRunner):
         int_time = 0
 
         for _ in range(self.nsteps):
+
+            if self.env.resolve_other_agents:
+                running_returns = 0
+                running_dones = []
+                running_infos = []
+                for agent in self.env.other_agents:
+                    # switched_obs = [self.env.switch_player(o, agent.player_idx) for o in self.obs]
+                    other_agent_action = agent.direct_action(self.obs)
+                    self.obs[:], rewards, dones, infos = self.env.step(other_agent_action)
+                    print(dones)
+                    print(infos)
+                    # TODO: still doesn't fix using this extra info here
+                    running_dones.append(dones)
+                    running_returns += rewards
+                    running_infos.append(infos)
+
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
             actions, values, self.states, neglogpacs = self.model.step(self.obs, S=self.states, M=self.dones)
@@ -38,11 +54,12 @@ class Runner(AbstractEnvRunner):
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
 
-            partial = time.time()
-            observations = [switch_player(o) for o in self.obs]
-            other_agent_actions = self.env.other_agent.direct_action(observations)
-            actions = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
-            int_time += (time.time() - partial)
+            if self.env.joint_action:
+                partial = time.time()
+                observations = [switch_player(o) for o in self.obs]
+                other_agent_actions = self.env.other_agent.direct_action(observations)
+                actions = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
+                int_time += (time.time() - partial)
 
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
