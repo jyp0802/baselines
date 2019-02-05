@@ -28,18 +28,19 @@ class Model(object):
                 nsteps, ent_coef, vf_coef, max_grad_norm, scope, microbatch_size=None):
         
         self.sess = sess = get_session()
-        self.scope = scope + '/' if scope else ''
+        self.scope = scope
 
-        with tf.variable_scope(self.scope + 'ppo2_model', reuse=tf.AUTO_REUSE):
-            # CREATE OUR TWO MODELS
-            # act_model that is used for sampling
-            act_model = policy(nbatch_act, 1, sess)
+        with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
+            with tf.variable_scope('ppo2_model', reuse=tf.AUTO_REUSE):
+                # CREATE OUR TWO MODELS
+                # act_model that is used for sampling
+                act_model = policy(nbatch_act, 1, sess)
 
-            # Train model for training
-            if microbatch_size is None:
-                train_model = policy(nbatch_train, nsteps, sess)
-            else:
-                train_model = policy(microbatch_size, nsteps, sess)
+                # Train model for training
+                if microbatch_size is None:
+                    train_model = policy(nbatch_train, nsteps, sess)
+                else:
+                    train_model = policy(microbatch_size, nsteps, sess)
 
         # CREATE THE PLACEHOLDERS
         self.A = A = train_model.pdtype.sample_placeholder([None])
@@ -91,44 +92,46 @@ class Model(object):
 
         # UPDATE THE PARAMETERS USING LOSS
         # 1. Get the model parameters
-        params = tf.trainable_variables(self.scope + 'ppo2_model')
+        params = tf.trainable_variables(self.scope + '/ppo2_model')
         # 2. Build our trainer
-        with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
-            if MPI is not None:
-                self.trainer = MpiAdamOptimizer(MPI.COMM_WORLD, learning_rate=LR, epsilon=1e-5)
-            else:
-                self.trainer = tf.train.AdamOptimizer(learning_rate=LR, epsilon=1e-5)
-            # 3. Calculate the gradients
-            grads_and_var = self.trainer.compute_gradients(loss, params)
-            grads, var = zip(*grads_and_var)
+        if MPI is not None:
+            self.trainer = MpiAdamOptimizer(MPI.COMM_WORLD, learning_rate=LR, epsilon=1e-5)
+        else:
+            self.trainer = tf.train.AdamOptimizer(learning_rate=LR, epsilon=1e-5)
+        # 3. Calculate the gradients
+        grads_and_var = self.trainer.compute_gradients(loss, params)
+        grads, var = zip(*grads_and_var)
 
-            if max_grad_norm is not None:
-                # Clip the gradients (normalize)
-                grads, _grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
-            grads_and_var = list(zip(grads, var))
-            # zip aggregate each gradient with parameters associated
-            # For instance zip(ABCD, xyza) => Ax, By, Cz, Da
+        
 
-            self.grads = grads
-            self.var = var
-            self._train_op = self.trainer.apply_gradients(grads_and_var)
-            self.loss_names = ['policy_loss', 'value_loss', 'policy_entropy', 'approxkl', 'clipfrac']
-            self.stats_list = [pg_loss, vf_loss, entropy, approxkl, clipfrac]
+        if max_grad_norm is not None:
+            # Clip the gradients (normalize)
+            grads, _grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
+        grads_and_var = list(zip(grads, var))
+        # zip aggregate each gradient with parameters associated
+        # For instance zip(ABCD, xyza) => Ax, By, Cz, Da
+        self.grads = grads
+        self.var = var
+        self._train_op = self.trainer.apply_gradients(grads_and_var)
+        self.loss_names = ['policy_loss', 'value_loss', 'policy_entropy', 'approxkl', 'clipfrac']
+        self.stats_list = [pg_loss, vf_loss, entropy, approxkl, clipfrac]
 
 
-            self.train_model = train_model
-            self.act_model = act_model
-            self.step = act_model.step
-            self.value = act_model.value
-            self.initial_state = act_model.initial_state
+        self.train_model = train_model
+        self.act_model = act_model
+        self.step = act_model.step
+        self.value = act_model.value
+        self.initial_state = act_model.initial_state
 
-            self.save = functools.partial(save_variables, sess=sess)
-            self.load = functools.partial(load_variables, sess=sess)
+        self.save = functools.partial(save_variables, sess=sess)
+        self.load = functools.partial(load_variables, sess=sess)
 
-            initialize()
-            global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="")
-            if MPI is not None:
-                sync_from_root(sess, global_variables) #pylint: disable=E1101
+        initialize()
+        # TODO: Not sure what this next couple lines are doing
+        global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="")
+        if MPI is not None:
+            # print("NOT SURE WHAT THIS GUY IS DOING in model.py")
+            sync_from_root(sess, global_variables) #pylint: disable=E1101
 
     def train(self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None):
         # Here we calculate advantage A(s,a) = R + yV(s') - V(s)

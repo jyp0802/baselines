@@ -30,20 +30,22 @@ class Runner(AbstractEnvRunner):
 
         for _ in range(self.nsteps):
 
-            if self.env.resolve_other_agents:
-                running_returns = 0
-                running_dones = []
-                running_infos = []
-                for agent in self.env.other_agents:
-                    # switched_obs = [self.env.switch_player(o, agent.player_idx) for o in self.obs]
-                    other_agent_action = agent.direct_action(self.obs)
-                    self.obs[:], rewards, dones, infos = self.env.step(other_agent_action)
-                    print(dones)
-                    print(infos)
-                    # TODO: still doesn't fix using this extra info here
-                    running_dones.append(dones)
-                    running_returns += rewards
-                    running_infos.append(infos)
+            # if self.env.resolve_other_agents:
+            #     running_returns = 0
+            #     running_dones = []
+            #     running_infos = []
+            #     for agent in self.env.other_agents:
+            #         # switched_obs = [self.env.switch_player(o, agent.player_idx) for o in self.obs]
+            #         other_agent_action = agent.direct_action(self.obs)
+            #         self.obs[:], rewards, dones, infos = self.env.step(other_agent_action)
+            #         print(dones)
+            #         print(infos)
+            #         if dones:
+            #             break #?
+            #         # TODO: still doesn't fix using this extra info here
+            #         running_dones.append(dones)
+            #         running_returns += rewards
+            #         running_infos.append(infos)
 
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
