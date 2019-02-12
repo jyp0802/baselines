@@ -39,12 +39,12 @@ def argsparser():
     return parser.parse_args()
 
 
-def learn(env, policy_func, dataset, optim_batch_size=128, max_iters=1e4,
+def learn(env, policy_func, dataset, optim_batch_size=128, max_iters=2e3,
           adam_epsilon=1e-5, optim_stepsize=3e-4,
           ckpt_dir=None, log_dir=None, task_name=None,
           verbose=False):
 
-    val_per_iter = int(max_iters/10)
+    val_per_iter = int(max_iters/50)
     ob_space = env.observation_space
     ac_space = env.action_space
     pi = policy_func("pi", ob_space, ac_space)  # Construct network for new policy
@@ -52,7 +52,7 @@ def learn(env, policy_func, dataset, optim_batch_size=128, max_iters=1e4,
     ob = U.get_placeholder_cached(name="ob")
     ac = pi.pdtype.sample_placeholder([None])
     stochastic = U.get_placeholder_cached(name="stochastic")
-    loss = tf.reduce_mean(tf.square(ac-pi.ac))
+    loss = tf.losses.softmax_cross_entropy(onehot_labels=tf.one_hot(ac, 6), logits=pi.logits)
     var_list = pi.get_trainable_variables()
     adam = MpiAdam(var_list, epsilon=adam_epsilon)
     lossandgrad = U.function([ob, ac, stochastic], [loss]+[U.flatgrad(loss, var_list)])
@@ -73,7 +73,7 @@ def learn(env, policy_func, dataset, optim_batch_size=128, max_iters=1e4,
         savedir_fname = tempfile.TemporaryDirectory().name
     else:
         savedir_fname = osp.join(ckpt_dir, task_name)
-    U.save_state(savedir_fname, var_list=pi.get_variables())
+    U.save_variables(savedir_fname, variables=pi.get_variables())
     return savedir_fname
 
 
@@ -109,6 +109,8 @@ def main(args):
                           log_dir=args.log_dir,
                           task_name=task_name,
                           verbose=True)
+
+    print("Saved model in ", savedir_fname)
     avg_len, avg_ret = runner(env,
                               policy_fn,
                               savedir_fname,

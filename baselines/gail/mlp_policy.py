@@ -73,3 +73,58 @@ class MlpPolicy(object):
 
     def get_initial_state(self):
         return []
+
+
+class CNNDiscretePolicy(object):
+    recurrent = False
+
+    def __init__(self, name, reuse=False, *args, **kwargs):
+        with tf.variable_scope(name):
+            if reuse:
+                tf.get_variable_scope().reuse_variables()
+            self._init(*args, **kwargs)
+            self.scope = tf.get_variable_scope().name
+
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True):
+        assert isinstance(ob_space, gym.spaces.Box)
+
+        self.pdtype = pdtype = make_pdtype(ac_space)
+        sequence_length = None
+
+        ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
+
+        from hr_coordination.ftw.ftw_utils import conv_network_fn
+        last_out = conv_network_fn()(ob)
+        
+        self.vpred = dense(last_out, 1, "vffinal", weight_init=U.normc_initializer(1.0))[:, 0]
+
+        self.logits = tf.layers.dense(last_out, 6, activation=None)
+        probs = tf.nn.softmax(self.logits, axis=1)
+        action_mode = tf.argmax(probs, axis=1)
+
+        action_dist = tf.distributions.Categorical(probs=probs)
+        action_sampled = action_dist.sample()
+        
+        self.pd = action_dist
+
+        self.state_in = []
+        self.state_out = []
+
+        # change for BC
+        stochastic = U.get_placeholder(name="stochastic", dtype=tf.bool, shape=())
+        ac = action_sampled
+        self.ac = action_sampled
+        self._act = U.function([stochastic, ob], [ac, self.vpred])
+
+    def act(self, stochastic, ob):
+        ac1, vpred1 = self._act(stochastic, ob[None])
+        return ac1[0], vpred1[0]
+
+    def get_variables(self):
+        return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, self.scope)
+
+    def get_trainable_variables(self):
+        return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, self.scope)
+
+    def get_initial_state(self):
+        return []

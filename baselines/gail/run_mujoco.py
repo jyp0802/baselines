@@ -165,7 +165,7 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
     U.initialize()
     # Prepare for rollouts
     # ----------------------------------------
-    U.load_state(load_model_path)
+    U.load_variables(load_model_path)
 
     obs_list = []
     acs_list = []
@@ -216,7 +216,12 @@ def traj_1_generator(pi, env, horizon, stochastic):
         news.append(new)
         acs.append(ac)
 
-        ob, rew, new, _ = env.step(ac)
+        other_agent_ob = env.env.base_env.mdp.switch_player(ob)
+        # other_agent_actions = env.other_agent.direct_action([other_agent_ob for _ in range(env.sim_threads)])[0]
+        ac2, vpred2 = pi.act(stochastic, other_agent_ob)
+        joint_action = (ac, ac2)
+        print(env.env.base_env)
+        ob, rew, new, _ = env.step(joint_action)
         rews.append(rew)
 
         cur_ep_ret += rew
