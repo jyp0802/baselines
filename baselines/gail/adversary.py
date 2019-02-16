@@ -23,7 +23,7 @@ class TransitionClassifier(object):
         self.observation_shape = env.observation_space.shape
         self.actions_shape = env.action_space.shape
         self.input_shape = tuple([o+a for o, a in zip(self.observation_shape, self.actions_shape)])
-        self.num_actions = env.action_space.shape[0]
+        self.num_actions = env.action_space.n
         self.hidden_size = hidden_size
         self.build_ph()
         # Build grpah
@@ -67,6 +67,8 @@ class TransitionClassifier(object):
             with tf.variable_scope("obfilter"):
                 self.obs_rms = RunningMeanStd(shape=self.observation_shape)
             obs = (obs_ph - self.obs_rms.mean / self.obs_rms.std)
+            acs_ph = tf.reshape(acs_ph, (-1, 1))
+            obs = tf.reshape(obs, (-1, 5 * 5 * 25))
             _input = tf.concat([obs, acs_ph], axis=1)  # concatenate the two input -> form a transition
             p_h1 = tf.contrib.layers.fully_connected(_input, self.hidden_size, activation_fn=tf.nn.tanh)
             p_h2 = tf.contrib.layers.fully_connected(p_h1, self.hidden_size, activation_fn=tf.nn.tanh)
@@ -78,9 +80,9 @@ class TransitionClassifier(object):
 
     def get_reward(self, obs, acs):
         sess = tf.get_default_session()
-        if len(obs.shape) == 1:
+        if len(obs.shape) == 3:
             obs = np.expand_dims(obs, 0)
-        if len(acs.shape) == 1:
+        if len(acs.shape) == 0:
             acs = np.expand_dims(acs, 0)
         feed_dict = {self.generator_obs_ph: obs, self.generator_acs_ph: acs}
         reward = sess.run(self.reward_op, feed_dict)

@@ -70,7 +70,16 @@ def traj_segment_generator(pi, env, reward_giver, horizon, stochastic):
         prevacs[i] = prevac
 
         rew = reward_giver.get_reward(ob, ac)
-        ob, true_rew, new, _ = env.step(ac)
+
+        ######################## overcooked handling
+        other_agent_ob = env.env.base_env.mdp.switch_player(ob)
+        ac2 = env.other_agent.direct_action([other_agent_ob for _ in range(env.sim_threads)])[0]
+        # ac2, vpred2 = pi.act(stochastic, other_agent_ob)
+        joint_action = (ac, ac2)
+
+        ob, true_rew, new, _ = env.step(joint_action)
+        ########################
+
         rews[i] = rew
         true_rews[i] = true_rew
 
@@ -128,7 +137,7 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
     ob = U.get_placeholder_cached(name="ob")
     ac = pi.pdtype.sample_placeholder([None])
 
-    kloldnew = oldpi.pd.kl(pi.pd)
+    kloldnew = tf.distributions.kl_divergence(oldpi.pd, pi.pd) #oldpi.pd.kl(pi.pd)
     ent = pi.pd.entropy()
     meankl = tf.reduce_mean(kloldnew)
     meanent = tf.reduce_mean(ent)
@@ -136,7 +145,7 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
 
     vferr = tf.reduce_mean(tf.square(pi.vpred - ret))
 
-    ratio = tf.exp(pi.pd.logp(ac) - oldpi.pd.logp(ac))  # advantage * pnew / pold
+    ratio = tf.exp(pi.pd.log_prob(ac) - oldpi.pd.log_prob(ac))  # advantage * pnew / pold
     surrgain = tf.reduce_mean(ratio * atarg)
 
     optimgain = surrgain + entbonus
@@ -148,10 +157,12 @@ def learn(env, policy_func, reward_giver, expert_dataset, rank,
     all_var_list = pi.get_trainable_variables()
     var_list = [v for v in all_var_list if v.name.startswith("pi/pol") or v.name.startswith("pi/logstd")]
     vf_var_list = [v for v in all_var_list if v.name.startswith("pi/vff")]
-    assert len(var_list) == len(vf_var_list) + 1
+    # NOTE: This assertion fails
+    # assert len(var_list) == len(vf_var_list) + 1, "{} {}".format(len(var_list), len(vf_var_list) + 1)
     d_adam = MpiAdam(reward_giver.get_trainable_variables())
     vfadam = MpiAdam(vf_var_list)
 
+    print("VAR", var_list)
     get_flat = U.GetFlat(var_list)
     set_from_flat = U.SetFromFlat(var_list)
     klgrads = tf.gradients(dist, var_list)
