@@ -11,6 +11,7 @@ try:
 except ImportError:
     MPI = None
 from baselines.ppo2.runner import Runner
+from collections import defaultdict
 
 
 def constfn(val):
@@ -123,7 +124,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     best_rew_per_step = 0
 
-    run_info = {'eprewmean': [], 'eplenmean': []}
+    run_info = defaultdict(list)
     nupdates = total_timesteps//nbatch
     print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
@@ -206,18 +207,30 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv("total_timesteps", update*nbatch)
             logger.logkv("fps", fps)
             logger.logkv("explained_variance", float(ev))
+            
             eprewmean = safemean([epinfo['r'] for epinfo in epinfobuf])
+            ep_dense_rew_mean = safemean([epinfo['dense_r'] for epinfo in epinfobuf])
+            ep_sparse_rew_mean = safemean([epinfo['sparse_r'] for epinfo in epinfobuf])
             eplenmean = safemean([epinfo['l'] for epinfo in epinfobuf])
             run_info['eprewmean'].append(eprewmean)
+            run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
+            run_info['ep_sparse_rew_mean'].append(ep_sparse_rew_mean)
             run_info['eplenmean'].append(eplenmean)
+            run_info['explained_variance'].append(float(ev))
+
             logger.logkv('eprewmean', eprewmean)
             logger.logkv('eplenmean', eplenmean)
             if eval_env is not None:
                 logger.logkv('eval_eprewmean', safemean([epinfo['r'] for epinfo in eval_epinfobuf]) )
                 logger.logkv('eval_eplenmean', safemean([epinfo['l'] for epinfo in eval_epinfobuf]) )
+            
             logger.logkv('time_elapsed', tnow - tfirststart)
+            
             for (lossval, lossname) in zip(lossvals, model.loss_names):
+                run_info[lossname].append(lossval)
+                
                 logger.logkv(lossname, lossval)
+
             if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
                 logger.dumpkvs()
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
