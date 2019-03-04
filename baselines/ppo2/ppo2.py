@@ -87,6 +87,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     total_timesteps = int(total_timesteps)
 
     policy = build_policy(env, network, **network_kwargs)
+    additional_params = network_kwargs["network_kwargs"]
 
     # Get the nb of env
     nenvs = env.num_envs
@@ -239,6 +240,17 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             savepath = osp.join(checkdir, '%.5i'%update)
             print('Saving to', savepath)
             model.save(savepath)
+
+        if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
+            from hr_coordination.agents.agent import AgentPair
+            from hr_coordination.agents.benchmarking import AgentEvaluator
+            from hr_coordination.ftw.ftw_utils import setup_mdp_env, get_agent_from_model
+
+            overcooked_env = setup_mdp_env(display=False, **additional_params)
+            agent = get_agent_from_model(model, additional_params["SIM_THREADS"])
+            agent.set_mdp(overcooked_env.mdp)
+            agent_pair = AgentPair(agent, env.other_agent)
+            overcooked_env.run_agents(agent_pair, display=True)
 
     if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')
