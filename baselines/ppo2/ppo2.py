@@ -250,6 +250,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             from hr_coordination.agents.agent import AgentPair
             from hr_coordination.agents.benchmarking import AgentEvaluator
             from hr_coordination.ftw.ftw_utils import setup_mdp_env, get_agent_from_model
+            print(additional_params["SAVE_DIR"])
 
             overcooked_env = setup_mdp_env(display=False, **additional_params)
             agent = get_agent_from_model(model, additional_params["SIM_THREADS"])
