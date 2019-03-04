@@ -247,7 +247,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             model.save(savepath)
         
         run_type = additional_params["RUN_TYPE"]
-        if run_type in ["ppo", "joint_ppo"] and update % 1 == 0: #additional_params["VIZ_FREQUENCY"] == 0:
+        if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
             from hr_coordination.agents.agent import AgentPair
             from hr_coordination.agents.benchmarking import AgentEvaluator
             from hr_coordination.ftw.ftw_utils import setup_mdp_env, get_agent_from_model
