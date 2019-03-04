@@ -245,17 +245,23 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             savepath = osp.join(checkdir, '%.5i'%update)
             print('Saving to', savepath)
             model.save(savepath)
-
-        if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
+        
+        run_type = additional_params["RUN_TYPE"]
+        if run_type in ["ppo", "joint_ppo"] and update % 1 == 0: #additional_params["VIZ_FREQUENCY"] == 0:
             from hr_coordination.agents.agent import AgentPair
             from hr_coordination.agents.benchmarking import AgentEvaluator
             from hr_coordination.ftw.ftw_utils import setup_mdp_env, get_agent_from_model
             print(additional_params["SAVE_DIR"])
 
             overcooked_env = setup_mdp_env(display=False, **additional_params)
-            agent = get_agent_from_model(model, additional_params["SIM_THREADS"])
+            agent = get_agent_from_model(model, additional_params["SIM_THREADS"], is_joint_action=(run_type == "joint_ppo"))
             agent.set_mdp(overcooked_env.mdp)
-            agent_pair = AgentPair(agent, env.other_agent)
+
+            if run_type == "ppo":
+                agent_pair = AgentPair(agent, env.other_agent)
+            else:
+                agent_pair = AgentPair(agent)
+            
             overcooked_env.run_agents(agent_pair, display=True)
 
     if nupdates > 0 and early_stopping:
