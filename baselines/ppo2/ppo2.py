@@ -2,7 +2,6 @@ import os
 import time, tqdm
 import numpy as np
 import os.path as osp
-from baselines import logger
 from collections import deque
 from baselines.common import explained_variance, set_global_seeds
 from baselines.common.policies import build_policy
@@ -77,6 +76,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
 
     '''
+    from baselines import logger
 
     set_global_seeds(seed)
 
