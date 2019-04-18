@@ -42,9 +42,9 @@ def argsparser():
 def learn(env, policy_func, dataset, optim_batch_size=128, max_iters=2e3,
           adam_epsilon=1e-5, optim_stepsize=3e-4,
           ckpt_dir=None, log_dir=None, task_name=None,
-          verbose=False):
-
-    val_per_iter = int(max_iters/50)
+          verbose=False, params=None):
+    val_per_iter = params["VALID_LOG_FREQ"]
+    losses = []
     ob_space = env.observation_space
     ac_space = env.action_space
     pi = policy_func("pi", ob_space, ac_space)  # Construct network for new policy
@@ -68,13 +68,14 @@ def learn(env, policy_func, dataset, optim_batch_size=128, max_iters=2e3,
             ob_expert, ac_expert = dataset.get_next_batch(-1, 'val')
             val_loss, _ = lossandgrad(ob_expert, ac_expert, True)
             logger.log("Training loss: {}, Validation loss: {}".format(train_loss, val_loss))
+            losses.append([train_loss, val_loss])
 
     if ckpt_dir is None:
         savedir_fname = tempfile.TemporaryDirectory().name
     else:
         savedir_fname = osp.join(ckpt_dir, task_name)
     U.save_variables(savedir_fname, variables=pi.get_variables())
-    return savedir_fname
+    return savedir_fname, losses
 
 
 def get_task_name(args):

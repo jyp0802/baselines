@@ -85,7 +85,7 @@ class CNNDiscretePolicy(object):
             self._init(*args, **kwargs)
             self.scope = tf.get_variable_scope().name
 
-    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True):
+    def _init(self, ob_space, ac_space, hid_size, num_hid_layers, gaussian_fixed_var=True, **kwargs):
         assert isinstance(ob_space, gym.spaces.Box)
 
         self.pdtype = pdtype = make_pdtype(ac_space)
@@ -93,8 +93,8 @@ class CNNDiscretePolicy(object):
 
         ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
 
-        from hr_coordination.ftw.ftw_utils import conv_network_fn
-        last_out = conv_network_fn()(ob)
+        from hr_coordination.pbt.pbt_utils import conv_network_fn
+        last_out = conv_network_fn(**kwargs)(ob)
         
         self.vpred = dense(last_out, 1, "vffinal", weight_init=U.normc_initializer(1.0))[:, 0]
 

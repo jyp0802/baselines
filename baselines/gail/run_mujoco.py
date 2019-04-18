@@ -155,7 +155,7 @@ def train(env, seed, policy_fn, reward_giver, dataset, algo,
 
 
 def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
-           stochastic_policy, save=False, reuse=False):
+           stochastic_policy, save=False, reuse=False, display=False):
 
     # Setup network
     # ----------------------------------------
@@ -172,7 +172,7 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
     len_list = []
     ret_list = []
     for _ in tqdm(range(number_trajs)):
-        traj = traj_1_generator(pi, env, timesteps_per_batch, stochastic=stochastic_policy)
+        traj = traj_1_generator(pi, env, timesteps_per_batch, stochastic=stochastic_policy, display=display)
         obs, acs, ep_len, ep_ret = traj['ob'], traj['ac'], traj['ep_len'], traj['ep_ret']
         obs_list.append(obs)
         acs_list.append(acs)
@@ -194,7 +194,7 @@ def runner(env, policy_func, load_model_path, timesteps_per_batch, number_trajs,
 
 
 # Sample one trajectory (until trajectory end)
-def traj_1_generator(pi, env, horizon, stochastic):
+def traj_1_generator(pi, env, horizon, stochastic, display):
 
     t = 0
     ac = env.action_space.sample()  # not used, just so we have the datatype
@@ -211,16 +211,18 @@ def traj_1_generator(pi, env, horizon, stochastic):
     acs = []
 
     while True:
+        # Both agents are paired together from model
         ac, vpred = pi.act(stochastic, ob)
         obs.append(ob)
         news.append(new)
         acs.append(ac)
 
-        other_agent_ob = env.env.base_env.mdp.switch_player(ob)
+        other_agent_ob = env.base_env.mdp.switch_player(ob)
         # other_agent_actions = env.other_agent.direct_action([other_agent_ob for _ in range(env.sim_threads)])[0]
         ac2, vpred2 = pi.act(stochastic, other_agent_ob)
         joint_action = (ac, ac2)
-        print(env.env.base_env)
+        if display:
+            print(env.base_env)
         ob, rew, new, _ = env.step(joint_action)
         rews.append(rew)
 
