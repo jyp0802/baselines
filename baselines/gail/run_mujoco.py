@@ -222,6 +222,7 @@ def traj_1_generator(pi, env, horizon, stochastic, display):
         ac2, vpred2 = pi.act(stochastic, other_agent_ob)
         joint_action = (ac, ac2)
         if display:
+            print(t)
             print(env.base_env)
         ob, rew, new, _ = env.step(joint_action)
         rews.append(rew)
@@ -231,6 +232,9 @@ def traj_1_generator(pi, env, horizon, stochastic, display):
         if new or t >= horizon:
             break
         t += 1
+
+    # NOTE: assuming that environment will never give a "done" token
+    assert cur_ep_len == horizon + 1, "Actual episode len: {}".format(cur_ep_len)
 
     obs = np.array(obs)
     rews = np.array(rews)
