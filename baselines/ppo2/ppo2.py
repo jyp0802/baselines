@@ -121,7 +121,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         eval_epinfobuf = deque(maxlen=100)
 
     # Start total timer
-    tfirststart = time.time()
+    tfirststart = time.perf_counter()
 
     best_rew_per_step = 0
 
@@ -131,7 +131,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     for update in range(1, nupdates+1):
         assert nbatch % nminibatches == 0
         # Start timer
-        tstart = time.time()
+        tstart = time.perf_counter()
         frac = 1.0 - (update - 1.0) / nupdates
         # Calculate the learning rate
         lrnow = lr(frac)
@@ -182,7 +182,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             envsperbatch = nenvs // nminibatches
             envinds = np.arange(nenvs)
             flatinds = np.arange(nenvs * nsteps).reshape(nenvs, nsteps)
-            envsperbatch = nbatch_train // nsteps
             for _ in range(noptepochs):
                 np.random.shuffle(envinds)
                 for start in range(0, nenvs, envsperbatch):
@@ -196,7 +195,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         # Feedforward --> get losses --> update
         lossvals = np.mean(mblossvals, axis=0)
         # End timer
-        tnow = time.time()
+        tnow = time.perf_counter()
         # Calculate the fps (frame per second)
         fps = int(nbatch / (tnow - tstart))
         if update % log_interval == 0 or update == 1:

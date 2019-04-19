@@ -66,9 +66,11 @@ class TransitionClassifier(object):
 
             with tf.variable_scope("obfilter"):
                 self.obs_rms = RunningMeanStd(shape=self.observation_shape)
-            obs = (obs_ph - self.obs_rms.mean / self.obs_rms.std)
+            obs = (obs_ph - self.obs_rms.mean) / self.obs_rms.std
+            
             acs_ph = tf.reshape(acs_ph, (-1, 1))
             obs = tf.reshape(obs, (-1, 5 * 5 * 25))
+            
             _input = tf.concat([obs, acs_ph], axis=1)  # concatenate the two input -> form a transition
             p_h1 = tf.contrib.layers.fully_connected(_input, self.hidden_size, activation_fn=tf.nn.tanh)
             p_h2 = tf.contrib.layers.fully_connected(p_h1, self.hidden_size, activation_fn=tf.nn.tanh)
