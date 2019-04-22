@@ -200,7 +200,7 @@ def traj_1_generator(pi, env, horizon, stochastic, display):
     ac = env.action_space.sample()  # not used, just so we have the datatype
     new = True  # marks if we're on first timestep of an episode
 
-    ob = env.reset()
+    ob0, ob1 = env.reset()
     cur_ep_ret = 0  # return in current episode
     cur_ep_len = 0  # len of current episode
 
@@ -212,19 +212,19 @@ def traj_1_generator(pi, env, horizon, stochastic, display):
 
     while True:
         # Both agents are paired together from model
-        ac, vpred = pi.act(stochastic, ob)
-        obs.append(ob)
+        ac, vpred = pi.act(stochastic, ob0)
+        obs.append(ob0)
         news.append(new)
         acs.append(ac)
 
-        other_agent_ob = env.base_env.mdp.switch_player(ob)
         # other_agent_actions = env.other_agent.direct_action([other_agent_ob for _ in range(env.sim_threads)])[0]
-        ac2, vpred2 = pi.act(stochastic, other_agent_ob)
+        ac2, vpred2 = pi.act(stochastic, ob1)
         joint_action = (ac, ac2)
         if display:
             print(t)
             print(env.base_env)
         ob, rew, new, _ = env.step(joint_action)
+        ob0, ob1 = ob
         rews.append(rew)
 
         cur_ep_ret += rew
