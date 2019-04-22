@@ -49,23 +49,38 @@ class Runner(AbstractEnvRunner):
 
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
-            actions, values, self.states, neglogpacs = self.model.step(self.obs, S=self.states, M=self.dones)
-            mb_obs.append(self.obs.copy())
+            overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
+            if overcooked:
+                actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
+                other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+                joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
+
+                mb_obs.append(self.obs0.copy())
+            else:
+                actions, values, self.states, neglogpacs = self.model.step(self.obs, S=self.states, M=self.dones)
+                mb_obs.append(self.obs.copy())
+
             mb_actions.append(actions)
             mb_values.append(values)
             mb_neglogpacs.append(neglogpacs)
             mb_dones.append(self.dones)
 
-            if self.env.joint_action:
-                partial = time.time()
-                observations = [switch_player(o) for o in self.obs]
-                other_agent_actions = self.env.other_agent.direct_action(observations)
-                actions = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
-                int_time += (time.time() - partial)
+            # if self.env.joint_action:
+            #     partial = time.time()
+            #     observations = [switch_player(o) for o in self.obs]
+            #     other_agent_actions = self.env.other_agent.direct_action(observations)
+                
+            #     int_time += (time.time() - partial)
 
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
-            self.obs[:], rewards, self.dones, infos = self.env.step(actions)
+            if overcooked:
+                both_obs, rewards, self.dones, infos = self.env.step(joint_action)
+                self.obs0[:] = both_obs[0]
+                self.obs1[:] = both_obs[1]
+            else:
+                self.obs[:], rewards, self.dones, infos = self.env.step(actions)
+
             for info in infos:
                 maybeepinfo = info.get('episode')
                 if maybeepinfo: epinfos.append(maybeepinfo)
