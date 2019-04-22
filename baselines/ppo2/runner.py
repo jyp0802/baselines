@@ -52,8 +52,12 @@ class Runner(AbstractEnvRunner):
             overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
             if overcooked:
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
-                other_agent_actions = self.env.other_agent.direct_action(self.obs1)
-                joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
+
+                if not self.env.joint_action_model:
+                    other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+                    joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
+                else:
+                    joint_action = actions
 
                 mb_obs.append(self.obs0.copy())
             else:
