@@ -257,11 +257,13 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             agent.set_mdp(overcooked_env.mdp)
 
             if run_type == "ppo":
+                env.other_agent.set_mdp(overcooked_env.mdp)
                 agent_pair = AgentPair(agent, env.other_agent)
             else:
                 agent_pair = AgentPair(agent)
             
-            overcooked_env.run_agents(agent_pair, display=True)
+            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True)
+            print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
 
     if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')

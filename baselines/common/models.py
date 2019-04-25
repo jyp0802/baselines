@@ -28,7 +28,7 @@ def nature_cnn(unscaled_images, **conv_kwargs):
 
 
 @register("mlp")
-def mlp(num_layers=2, num_hidden=64, activation=tf.tanh, layer_norm=False):
+def mlp(num_layers=2, num_hidden=64, activation=tf.tanh, layer_norm=False, **other):
     """
     Stack of fully-connected layers to be used in a policy / q-function approximator
 
