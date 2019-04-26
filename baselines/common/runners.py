@@ -13,9 +13,15 @@ class AbstractEnvRunner(ABC):
         if overcooked:
             self.obs0 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
             self.obs1 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
-            ob0, ob1 = env.reset()
-            self.obs0[:] = ob0
-            self.obs1[:] = ob1
+
+            both_obs = env.reset()
+            transp_shape = list(range(len(both_obs.shape)))
+            transp_shape[0] = 1
+            transp_shape[1] = 0
+
+            both_obs = np.transpose(both_obs, transp_shape)
+            self.obs0[:] = both_obs[0]
+            self.obs1[:] = both_obs[1]
         else:
             self.obs[:] = env.reset()
         self.nsteps = nsteps

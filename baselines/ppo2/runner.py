@@ -80,6 +80,10 @@ class Runner(AbstractEnvRunner):
             # Infos contains a ton of useful informations
             if overcooked:
                 both_obs, rewards, self.dones, infos = self.env.step(joint_action)
+                transp_shape = list(range(len(both_obs.shape)))
+                transp_shape[0] = 1
+                transp_shape[1] = 0
+                both_obs = np.transpose(both_obs, transp_shape)
                 self.obs0[:] = both_obs[0]
                 self.obs1[:] = both_obs[1]
             else:
