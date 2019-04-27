@@ -54,8 +54,25 @@ class Runner(AbstractEnvRunner):
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
 
                 if not self.env.joint_action_model:
-                    other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+                    
+                    if self.env.other_agent_bc:
+                        from hr_coordination.mdp.overcooked_mdp import Action
+                        other_agent_actions = []
+                        for i in range(len(self.curr_state)):
+                            s = self.curr_state[i]
+                            a_idx = self.other_agent_idx[i]
+                            self.env.other_agent.set_agent_index(a_idx)
+                            action = self.env.other_agent.action(s)
+                            other_agent_actions.append(Action.ACTION_TO_INDEX[action])
+                        # featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
+                        # player_featurizes_states = [s[idx] for s, idx in zip(featurized_states, self.other_agent_idx)]
+                        # other_agent_actions = [self.env.other_agent.action(s) for s in self.curr_state]
+                        # sampled = np.random.choice(other_agent_actions)
+                    else:
+                        other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+                    
                     joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
+                    
                 else:
                     joint_action = actions
 
@@ -79,13 +96,39 @@ class Runner(AbstractEnvRunner):
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
             if overcooked:
-                both_obs, rewards, self.dones, infos = self.env.step(joint_action)
-                transp_shape = list(range(len(both_obs.shape)))
+                both_obs_and_state_and_other_idx, rewards, self.dones, infos = self.env.step(joint_action)
+
+                # PROCESSING
+                transp_shape = list(range(len(both_obs_and_state_and_other_idx.shape)))
                 transp_shape[0] = 1
                 transp_shape[1] = 0
-                both_obs = np.transpose(both_obs, transp_shape)
-                self.obs0[:] = both_obs[0]
-                self.obs1[:] = both_obs[1]
+                both_obs_and_state_and_other_idx = np.transpose(both_obs_and_state_and_other_idx, transp_shape)
+                
+                both_obs, state_and_other_idx = both_obs_and_state_and_other_idx
+                state_and_other_idx = np.array(state_and_other_idx)
+                both_obs = np.array(both_obs)
+
+                threads, players = np.array(both_obs).shape
+                
+                obs = []
+                for y in range(players):
+                    sub_obs = []
+                    for x in range(threads):
+                        sub_obs.append(both_obs[x][y])
+                    obs.append(sub_obs)
+
+                obs0, obs1 = obs
+                # print(np.array(obs0).shape)
+                # print(np.array(obs1).shape)
+                # # both_obs = np.hstack(both_obs)
+                
+                # print([np.array(a).shape for a in both_obs])
+                # print(both_obs.shape)
+                # print(both_obs)
+
+                self.obs0[:] = np.array(obs0) #np.concatenate(both_obs[:,0])
+                self.obs1[:] = np.array(obs1) #np.concatenate(both_obs[:,1])
+                self.curr_state, self.other_agent_idx = state_and_other_idx[:, 0], state_and_other_idx[:, 1]
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
 
