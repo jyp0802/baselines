@@ -60,7 +60,7 @@ class Runner(AbstractEnvRunner):
                     
                     if self.env.other_agent_bc:
 
-                        if self.env.other_agent_bc.true:
+                        if self.env.is_true_agent:
                             from hr_coordination.mdp.overcooked_mdp import Action
                             other_agent_actions = []
                             for i in range(len(self.curr_state)):
