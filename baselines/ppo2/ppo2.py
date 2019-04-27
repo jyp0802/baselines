@@ -218,6 +218,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             run_info['eplenmean'].append(eplenmean)
             run_info['explained_variance'].append(float(ev))
 
+            logger.logkv('true_eprew', safemean([epinfo['sparse_r'] for epinfo in epinfobuf]))
             logger.logkv('eprewmean', eprewmean)
             logger.logkv('eplenmean', eplenmean)
             if eval_env is not None:
