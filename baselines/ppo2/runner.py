@@ -28,6 +28,7 @@ class Runner(AbstractEnvRunner):
         tot_time = time.time()
         int_time = 0
 
+        ok2 = 0
         for _ in range(self.nsteps):
 
             # if self.env.resolve_other_agents:
@@ -72,9 +73,8 @@ class Runner(AbstractEnvRunner):
                         # sampled = np.random.choice(other_agent_actions)
                     else:
                         other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+                    ok2 += time.time() - ok
 
-                    print("Other agent actions took", time.time() - ok, "seconds")
-                    
                     joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
                     
                 else:
@@ -141,6 +141,7 @@ class Runner(AbstractEnvRunner):
                 if maybeepinfo: epinfos.append(maybeepinfo)
             mb_rewards.append(rewards)
 
+        print("Other agent actions took", ok2, "seconds")
         tot_time = time.time() - tot_time
         print("Total simulation time for {} steps: {} \t Other agent action time: {} \t {} steps/s".format(self.nsteps, tot_time, int_time, self.nsteps / tot_time))
         
