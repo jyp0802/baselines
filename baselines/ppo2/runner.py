@@ -54,6 +54,8 @@ class Runner(AbstractEnvRunner):
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
 
                 if not self.env.joint_action_model:
+                    import time
+                    ok = time.time()
                     
                     if self.env.other_agent_bc:
                         from hr_coordination.mdp.overcooked_mdp import Action
@@ -70,6 +72,8 @@ class Runner(AbstractEnvRunner):
                         # sampled = np.random.choice(other_agent_actions)
                     else:
                         other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+
+                    print("Other agent actions took", time.time() - ok, "seconds")
                     
                     joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
                     
