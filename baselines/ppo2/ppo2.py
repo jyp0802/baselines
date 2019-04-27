@@ -265,6 +265,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             
             trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True)
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
+            print(additional_params["SAVE_DIR"])
 
     if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')
