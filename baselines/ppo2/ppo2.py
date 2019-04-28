@@ -88,7 +88,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     policy = build_policy(env, network, **network_kwargs)
     additional_params = network_kwargs["network_kwargs"]
-
+    bestrew = 0
     # Get the nb of env
     nenvs = env.num_envs
 
@@ -220,12 +220,27 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             logger.logkv('true_eprew', safemean([epinfo['sparse_r'] for epinfo in epinfobuf]))
             logger.logkv('eprewmean', eprewmean)
+
+            if eprewmean > bestrew and eprewmean > 90:
+                from hr_coordination.ppo.ppo import save_ppo_model
+                print("BEST REW", eprewmean, "overwriting previous model with", bestrew)
+                save_ppo_model(model, "{}seed{}/best".format(
+                    additional_params["SAVE_DIR"],
+                    additional_params["CURR_SEED"])
+                )
+                bestrew = max(eprewmean, bestrew)
+
             logger.logkv('eplenmean', eplenmean)
             if eval_env is not None:
                 logger.logkv('eval_eprewmean', safemean([epinfo['r'] for epinfo in eval_epinfobuf]) )
                 logger.logkv('eval_eplenmean', safemean([epinfo['l'] for epinfo in eval_epinfobuf]) )
             
-            logger.logkv('time_elapsed', tnow - tfirststart)
+            time_elapsed = tnow - tfirststart
+            logger.logkv('time_elapsed', time_elapsed)
+
+            time_per_update = update / time_elapsed
+            time_remaining = (nupdates - update) * time_per_update
+            logger.logkv('time_remaining', time_remaining / 60)
             
             for (lossval, lossname) in zip(lossvals, model.loss_names):
                 run_info[lossname].append(lossval)
