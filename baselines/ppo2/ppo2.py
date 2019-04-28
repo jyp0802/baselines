@@ -221,14 +221,14 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv('true_eprew', safemean([epinfo['sparse_r'] for epinfo in epinfobuf]))
             logger.logkv('eprewmean', eprewmean)
 
-            if eprewmean > bestrew and eprewmean > 90:
+            if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 90:
                 from hr_coordination.ppo.ppo import save_ppo_model
-                print("BEST REW", eprewmean, "overwriting previous model with", bestrew)
+                print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                 save_ppo_model(model, "{}seed{}/best".format(
                     additional_params["SAVE_DIR"],
                     additional_params["CURR_SEED"])
                 )
-                bestrew = max(eprewmean, bestrew)
+                bestrew = max(ep_sparse_rew_mean, bestrew)
 
             logger.logkv('eplenmean', eplenmean)
             if eval_env is not None:
