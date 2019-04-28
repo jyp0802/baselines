@@ -73,6 +73,15 @@ class Runner(AbstractEnvRunner):
                             featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
                             player_featurizes_states = [s[idx] for s, idx in zip(featurized_states, self.other_agent_idx)]
                             other_agent_actions = self.env.other_agent.direct_policy(player_featurizes_states, sampled=True, no_wait=True)
+                    elif self.env.other_agent_hm:
+                        from hr_coordination.mdp.overcooked_mdp import Action
+                        other_agent_actions = []
+                        for i in range(len(self.curr_state)):
+                            s = self.curr_state[i]
+                            a_idx = self.other_agent_idx[i]
+                            self.env.other_agent.set_agent_index(a_idx)
+                            action = self.env.other_agent.action(s)
+                            other_agent_actions.append(Action.ACTION_TO_INDEX[action])
                     else:
                         other_agent_actions = self.env.other_agent.direct_action(self.obs1)
                     ok2 += time.time() - ok
