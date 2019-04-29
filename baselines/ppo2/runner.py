@@ -28,7 +28,7 @@ class Runner(AbstractEnvRunner):
         tot_time = time.time()
         int_time = 0
 
-        ok2 = 0
+        other_agent_simulation_time = 0
         for _ in range(self.nsteps):
 
             # if self.env.resolve_other_agents:
@@ -56,24 +56,10 @@ class Runner(AbstractEnvRunner):
 
                 if not self.env.joint_action_model:
                     import time
-                    ok = time.time()
+                    current_simulation_time = time.time()
                     
-                    if self.env.other_agent_bc:
-
-                        if self.env.is_true_agent:
-                            from hr_coordination.mdp.overcooked_mdp import Action
-                            other_agent_actions = []
-                            for i in range(len(self.curr_state)):
-                                s = self.curr_state[i]
-                                a_idx = self.other_agent_idx[i]
-                                self.env.other_agent.set_agent_index(a_idx)
-                                action = self.env.other_agent.action(s)
-                                other_agent_actions.append(Action.ACTION_TO_INDEX[action])
-                        else:
-                            featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
-                            player_featurizes_states = [s[idx] for s, idx in zip(featurized_states, self.other_agent_idx)]
-                            other_agent_actions = self.env.other_agent.direct_policy(player_featurizes_states, sampled=True, no_wait=True)
-                    elif self.env.other_agent_hm:
+                    if self.env.other_agent_true:
+                        # Get actions through the action method of the agent
                         from hr_coordination.mdp.overcooked_mdp import Action
                         other_agent_actions = []
                         for i in range(len(self.curr_state)):
@@ -82,9 +68,14 @@ class Runner(AbstractEnvRunner):
                             self.env.other_agent.set_agent_index(a_idx)
                             action = self.env.other_agent.action(s)
                             other_agent_actions.append(Action.ACTION_TO_INDEX[action])
+                    elif self.env.other_agent_bc:
+                        # Parallelise actions with direct action, using the featurization function
+                        featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
+                        player_featurizes_states = [s[idx] for s, idx in zip(featurized_states, self.other_agent_idx)]
+                        other_agent_actions = self.env.other_agent.direct_policy(player_featurizes_states, sampled=True, no_wait=True)
                     else:
                         other_agent_actions = self.env.other_agent.direct_action(self.obs1)
-                    ok2 += time.time() - ok
+                    other_agent_simulation_time += time.time() - current_simulation_time
 
                     joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]
                     
@@ -113,7 +104,8 @@ class Runner(AbstractEnvRunner):
             if overcooked:
                 both_obs_and_state_and_other_idx, rewards, self.dones, infos = self.env.step(joint_action)
 
-                # PROCESSING
+                # PROCESSING TODO: clean, same as runner in /common
+                ########## START CLEAN UP ######## 
                 transp_shape = list(range(len(both_obs_and_state_and_other_idx.shape)))
                 transp_shape[0] = 1
                 transp_shape[1] = 0
@@ -140,10 +132,10 @@ class Runner(AbstractEnvRunner):
                 # print([np.array(a).shape for a in both_obs])
                 # print(both_obs.shape)
                 # print(both_obs)
-
                 self.obs0[:] = np.array(obs0) #np.concatenate(both_obs[:,0])
                 self.obs1[:] = np.array(obs1) #np.concatenate(both_obs[:,1])
                 self.curr_state, self.other_agent_idx = state_and_other_idx[:, 0], state_and_other_idx[:, 1]
+                ##################### END CLEAN UP ######
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
 
@@ -152,7 +144,7 @@ class Runner(AbstractEnvRunner):
                 if maybeepinfo: epinfos.append(maybeepinfo)
             mb_rewards.append(rewards)
 
-        print("Other agent actions took", ok2, "seconds")
+        print("Other agent actions took", other_agent_simulation_time, "seconds")
         tot_time = time.time() - tot_time
         print("Total simulation time for {} steps: {} \t Other agent action time: {} \t {} steps/s".format(self.nsteps, tot_time, int_time, self.nsteps / tot_time))
         

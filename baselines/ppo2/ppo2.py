@@ -220,16 +220,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             logger.logkv('true_eprew', safemean([epinfo['sparse_r'] for epinfo in epinfobuf]))
             logger.logkv('eprewmean', eprewmean)
-
-            if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 90:
-                from hr_coordination.ppo.ppo import save_ppo_model
-                print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
-                save_ppo_model(model, "{}seed{}/best".format(
-                    additional_params["SAVE_DIR"],
-                    additional_params["CURR_SEED"])
-                )
-                bestrew = max(ep_sparse_rew_mean, bestrew)
-
             logger.logkv('eplenmean', eplenmean)
             if eval_env is not None:
                 logger.logkv('eval_eprewmean', safemean([epinfo['r'] for epinfo in eval_epinfobuf]) )
@@ -250,9 +240,19 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
                 logger.dumpkvs()
 
+            # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
                 from hr_coordination.utils import save_dict_to_file
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
+
+                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 90:
+                    from hr_coordination.ppo.ppo import save_ppo_model
+                    print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
+                    save_ppo_model(model, "{}seed{}/best".format(
+                        additional_params["SAVE_DIR"],
+                        additional_params["CURR_SEED"])
+                    )
+                    bestrew = max(ep_sparse_rew_mean, bestrew)
 
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
@@ -261,6 +261,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print('Saving to', savepath)
             model.save(savepath)
         
+        # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
             from hr_coordination.agents.agent import AgentPair
