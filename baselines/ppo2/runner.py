@@ -27,6 +27,7 @@ class Runner(AbstractEnvRunner):
         import time
         tot_time = time.time()
         int_time = 0
+        num_envs = len(self.curr_state)
 
         other_agent_simulation_time = 0
         for _ in range(self.nsteps):
@@ -62,12 +63,25 @@ class Runner(AbstractEnvRunner):
                         # Get actions through the action method of the agent
                         from hr_coordination.mdp.overcooked_mdp import Action
                         other_agent_actions = []
-                        for i in range(len(self.curr_state)):
+                        for i in range(num_envs):
                             s = self.curr_state[i]
                             a_idx = self.other_agent_idx[i]
                             self.env.other_agent.set_agent_index(a_idx)
                             action = self.env.other_agent.action(s)
                             other_agent_actions.append(Action.ACTION_TO_INDEX[action])
+                        
+                        p_self_play = self.env.self_play_randomization
+                        if p_self_play > 0:
+                            self_play_actions, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
+                            self_play_bools = np.random.random(num_envs) < p_self_play
+
+                            # Currently randomizes at the step level, might want to randomize at the trajectory level
+                            # That is harder to do though, as requires dealing with dones
+                            for i in range(num_envs):
+                                is_self_play_action = self_play_bools[i]
+                                if is_self_play_action:
+                                    other_agent_actions[i] = self_play_actions[i]
+
                     elif self.env.other_agent_bc:
                         # Parallelise actions with direct action, using the featurization function
                         featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
@@ -75,6 +89,7 @@ class Runner(AbstractEnvRunner):
                         other_agent_actions = self.env.other_agent.direct_policy(player_featurizes_states, sampled=True, no_wait=True)
                     else:
                         other_agent_actions = self.env.other_agent.direct_action(self.obs1)
+
                     other_agent_simulation_time += time.time() - current_simulation_time
 
                     joint_action = [(actions[i], other_agent_actions[i]) for i in range(len(actions))]

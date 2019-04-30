@@ -245,6 +245,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 from hr_coordination.utils import save_dict_to_file
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
 
+                # Save best model
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 90:
                     from hr_coordination.ppo.ppo import save_ppo_model
                     print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
@@ -253,6 +254,15 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         additional_params["CURR_SEED"])
                     )
                     bestrew = max(ep_sparse_rew_mean, bestrew)
+
+                if additional_params["SELF_PLAY_RND_GOAL"] != 0:
+                    rew_target = additional_params["SELF_PLAY_RND_GOAL"]
+                    shift = rew_target / 2
+                    t = (1 / rew_target) * 10
+                    fn = lambda x: -1 * (np.exp(t * (x - shift)) / (1 + np.exp(t * (x - shift)))) + 1
+                    
+                    env.self_play_randomization = fn(ep_sparse_rew_mean)
+                    print("Current self-play randomization", env.self_play_randomization)
 
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
