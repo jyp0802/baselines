@@ -256,32 +256,36 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     bestrew = max(ep_sparse_rew_mean, bestrew)
 
                 if additional_params["SELF_PLAY_RND_GOAL"] != 0:
-                    # tot_timeline = additional_params["PPO_RUN_TOT_TIMESTEPS"]
-                    self_play_thresh, self_play_timeline = additional_params["SELF_PLAY_RND_GOAL"]
+                    if type(additional_params["SELF_PLAY_RND_GOAL"]) is not list:
+                        # Evaluate self-play
+                        # env.self_play_randomization = 1
+                        # _, _, _, _, _, _, _, epinfos_selfplay = runner.run()
+                        # eprewmean_selfplay = safemean([epinfo['sparse_r'] for epinfo in epinfos_selfplay])
+                        curr_reward = ep_sparse_rew_mean
 
-                    def fn(x):
-                        if self_play_timeline - (self_play_timeline / self_play_thresh) * x > 1:
-                            return 1
-                        else:
-                            fn = lambda x: -1 * (x - self_play_thresh) * 1 / (self_play_timeline - self_play_thresh) + 1
-                            return max(fn(x), 0)
+                        rew_target = additional_params["SELF_PLAY_RND_GOAL"]
+                        shift = rew_target / 2
+                        t = (1 / rew_target) * 10
+                        fn = lambda x: -1 * (np.exp(t * (x - shift)) / (1 + np.exp(t * (x - shift)))) + 1
+                        
+                        env.self_play_randomization = fn(curr_reward)
+                        print("Current self-play randomization", env.self_play_randomization)
+                    else:
+                        # tot_timeline = additional_params["PPO_RUN_TOT_TIMESTEPS"]
+                        self_play_thresh, self_play_timeline = additional_params["SELF_PLAY_RND_GOAL"]
 
-                    curr_timestep = update*nbatch
-                    env.self_play_randomization = fn(curr_timestep)
-                    print("Current self-play randomization", env.self_play_randomization)
+                        def fn(x):
+                            if self_play_timeline - (self_play_timeline / self_play_thresh) * x > 1:
+                                return 1
+                            else:
+                                fn = lambda x: -1 * (x - self_play_thresh) * 1 / (self_play_timeline - self_play_thresh) + 1
+                                return max(fn(x), 0)
 
-                    # # Evaluate self-play
-                    # env.self_play_randomization = 1
-                    # _, _, _, _, _, _, _, epinfos_selfplay = runner.run()
-                    # eprewmean_selfplay = safemean([epinfo['sparse_r'] for epinfo in epinfos_selfplay])
+                        curr_timestep = update*nbatch
+                        env.self_play_randomization = fn(curr_timestep)
+                        print("Current self-play randomization", env.self_play_randomization)
 
-                    # rew_target = additional_params["SELF_PLAY_RND_GOAL"]
-                    # shift = rew_target / 2
-                    # t = (1 / rew_target) * 10
-                    # fn = lambda x: -1 * (np.exp(t * (x - shift)) / (1 + np.exp(t * (x - shift)))) + 1
-                    
-                    # env.self_play_randomization = fn(eprewmean_selfplay)
-                    # print("Current self-play randomization", env.self_play_randomization)
+                
 
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
