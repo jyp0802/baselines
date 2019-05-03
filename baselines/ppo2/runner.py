@@ -60,17 +60,26 @@ class Runner(AbstractEnvRunner):
                     current_simulation_time = time.time()
                     
                     if self.env.other_agent_true:
-                        # Get actions through the action method of the agent
-                        from hr_coordination.mdp.overcooked_mdp import Action
-                        other_agent_actions = []
-                        for i in range(num_envs):
-                            s = self.curr_state[i]
-                            a_idx = self.other_agent_idx[i]
-                            self.env.other_agent.set_agent_index(a_idx)
-                            action = self.env.other_agent.action(s)
-                            other_agent_actions.append(Action.ACTION_TO_INDEX[action])
-                        
                         p_self_play = self.env.self_play_randomization
+
+                        other_agent_actions = np.zeros_like(self.curr_state)
+
+                        if p_self_play < 1:
+                            # Get actions through the action method of the agent
+                            from hr_coordination.mdp.overcooked_mdp import Action
+                            other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
+                            other_agent_actions = [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
+
+                        ####### Naive non-parallelized way of getting actions for other ########
+                        
+                        # other_agent_actions = []
+                        # for i in range(num_envs):
+                        #     s = self.curr_state[i]
+                        #     a_idx = self.other_agent_idx[i]
+                        #     self.env.other_agent.set_agent_index(a_idx)
+                        #     action = self.env.other_agent.action(s)
+                        #     other_agent_actions.append(Action.ACTION_TO_INDEX[action])
+                        
                         if p_self_play > 0:
                             self_play_actions, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
                             self_play_bools = np.random.random(num_envs) < p_self_play
