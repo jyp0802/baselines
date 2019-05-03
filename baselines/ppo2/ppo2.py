@@ -257,6 +257,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 if additional_params["SELF_PLAY_RND_GOAL"] != 0:
                     if type(additional_params["SELF_PLAY_RND_GOAL"]) is not list:
+                        # Sigmoid self-play schedule
+
                         # Evaluate self-play
                         # env.self_play_randomization = 1
                         # _, _, _, _, _, _, _, epinfos_selfplay = runner.run()
@@ -271,6 +273,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         env.self_play_randomization = fn(curr_reward)
                         print("Current self-play randomization", env.self_play_randomization)
                     else:
+                        # Piecewise linear self-play schedule
+
                         # tot_timeline = additional_params["PPO_RUN_TOT_TIMESTEPS"]
                         self_play_thresh, self_play_timeline = additional_params["SELF_PLAY_RND_GOAL"]
 
