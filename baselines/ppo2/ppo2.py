@@ -275,7 +275,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     else:
                         # Piecewise linear self-play schedule
 
-                        # tot_timeline = additional_params["PPO_RUN_TOT_TIMESTEPS"]
+                        # self_play_thresh: when we should stop doing 100% self-play
+                        # self_play_timeline: when we should reach doing 0% self-play
                         self_play_thresh, self_play_timeline = additional_params["SELF_PLAY_RND_GOAL"]
 
                         def fn(x):
@@ -285,7 +286,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                                 fn = lambda x: -1 * (x - self_play_thresh) * 1 / (self_play_timeline - self_play_thresh) + 1
                                 return max(fn(x), 0)
 
-                        curr_timestep = update*nbatch
+                        curr_timestep = update * nbatch
                         env.self_play_randomization = fn(curr_timestep)
                         print("Current self-play randomization", env.self_play_randomization)
 
