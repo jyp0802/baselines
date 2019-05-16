@@ -49,10 +49,12 @@ class PolicyWithValue(object):
         self.pd, self.pi = self.pdtype.pdfromlatent(latent, init_scale=0.01)
 
         # Actions probs
-        self.action_probs = self.pd.mean
+        action_probs = self.pd.mean
+        self.action_probs = tf.identity(action_probs, name="action_probs")
 
         # Take an action
-        self.action = self.pd.sample()
+        action = self.pd.sample()
+        self.action = tf.identity(action, name="action")
 
         # Calculate the neg log of our probability
         self.neglogp = self.pd.neglogp(self.action)
@@ -65,6 +67,8 @@ class PolicyWithValue(object):
         else:
             self.vf = fc(vf_latent, 'vf', 1)
             self.vf = self.vf[:,0]
+        
+        self.vf = tf.identity(self.vf, name="value")
 
     def _evaluate(self, variables, observation, **extra_feed):
         sess = self.sess

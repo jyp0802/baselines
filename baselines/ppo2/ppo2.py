@@ -246,7 +246,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
 
                 # Save best model
-                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 90:
+                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 20:
                     from hr_coordination.ppo.ppo import save_ppo_model
                     print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                     save_ppo_model(model, "{}seed{}/best".format(
@@ -312,8 +312,11 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             agent.set_mdp(overcooked_env.mdp)
 
             if run_type == "ppo":
-                env.other_agent.set_mdp(overcooked_env.mdp)
-                agent_pair = AgentPair(agent, env.other_agent)
+                if additional_params["OTHER_AGENT_TYPE"] == 'sp':
+                    agent_pair = AgentPair(agent, agent)
+                else:
+                    env.other_agent.set_mdp(overcooked_env.mdp)
+                    agent_pair = AgentPair(agent, env.other_agent)
             else:
                 agent_pair = AgentPair(agent)
             
