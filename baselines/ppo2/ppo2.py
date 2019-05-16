@@ -198,6 +198,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         tnow = time.perf_counter()
         # Calculate the fps (frame per second)
         fps = int(nbatch / (tnow - tstart))
+
+        # TODO: Clean all of the following up a bit
+
         if update % log_interval == 0 or update == 1:
             # Calculates if value function is a good predicator of the returns (ev > 1)
             # or if it's just worse than predicting nothing (ev =< 0)
@@ -245,6 +248,26 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 from hr_coordination.utils import save_dict_to_file
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
 
+                # Linear annealing of reward shaping
+                if additional_params["REW_SHAPING_HORIZON"] != 0:
+                    # Piecewise linear annealing schedule
+                    # annealing_thresh: until when we should stop doing 100% reward shaping
+                    # annealing_horizon: when we should reach doing 0% reward shaping
+                    annealing_horizon = additional_params["REW_SHAPING_HORIZON"]
+                    annealing_thresh = 0
+
+                    def fn(x):
+                        if annealing_thresh != 0 and annealing_thresh - (annealing_horizon / annealing_thresh) * x > 1:
+                            return 1
+                        else:
+                            fn = lambda x: -1 * (x - annealing_thresh) * 1 / (annealing_horizon - annealing_thresh) + 1
+                            return max(fn(x), 0)
+
+                    curr_timestep = update * nbatch
+                    curr_reward_shaping = fn(curr_timestep)
+                    env.update_reward_shaping_param(curr_reward_shaping)
+                    print("Current reward shaping", curr_reward_shaping)
+
                 # Save best model
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 20:
                     from hr_coordination.ppo.ppo import save_ppo_model
@@ -280,7 +303,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         self_play_thresh, self_play_timeline = additional_params["SELF_PLAY_RND_GOAL"]
 
                         def fn(x):
-                            if self_play_timeline - (self_play_timeline / self_play_thresh) * x > 1:
+                            if self_play_thresh != 0 and self_play_timeline - (self_play_timeline / self_play_thresh) * x > 1:
                                 return 1
                             else:
                                 fn = lambda x: -1 * (x - self_play_thresh) * 1 / (self_play_timeline - self_play_thresh) + 1
