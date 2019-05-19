@@ -338,12 +338,19 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
                     agent_pair = AgentPair(agent, agent)
                 else:
+                    print("PPO agent on index 0:")
                     env.other_agent.set_mdp(overcooked_env.mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
+                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, displayUntil=100)
+                    print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards) 
+                    
+                    print("PPO agent on index 1:")
+                    agent_pair = AgentPair(env.other_agent, agent)
+                
             else:
                 agent_pair = AgentPair(agent)
             
-            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True)
+            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, displayUntil=100)
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
             print(additional_params["SAVE_DIR"])
 
