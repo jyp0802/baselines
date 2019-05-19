@@ -269,7 +269,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     print("Current reward shaping", curr_reward_shaping)
 
                 # Save best model
-                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > 20:
+                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
                     from hr_coordination.ppo.ppo import save_ppo_model
                     print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                     save_ppo_model(model, "{}seed{}/best".format(
