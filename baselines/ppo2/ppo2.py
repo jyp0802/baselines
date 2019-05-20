@@ -278,14 +278,15 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
                     if additional_params["OTHER_AGENT_TYPE"] == "bc" and additional_params["SELF_PLAY_RND_GOAL"] != 0 and env.self_play_randomization > 0:
                         # Don't save best model if still doing self play
-                        continue
-                    from hr_coordination.ppo.ppo import save_ppo_model
-                    print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
-                    save_ppo_model(model, "{}seed{}/best".format(
-                        additional_params["SAVE_DIR"],
-                        additional_params["CURR_SEED"])
-                    )
-                    bestrew = max(ep_sparse_rew_mean, bestrew)
+                        pass
+                    else:
+                        from hr_coordination.ppo.ppo import save_ppo_model
+                        print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
+                        save_ppo_model(model, "{}seed{}/best".format(
+                            additional_params["SAVE_DIR"],
+                            additional_params["CURR_SEED"])
+                        )
+                        bestrew = max(ep_sparse_rew_mean, bestrew)
 
                 if additional_params["SELF_PLAY_RND_GOAL"] != 0:
                     if type(additional_params["SELF_PLAY_RND_GOAL"]) is not list:
