@@ -76,9 +76,15 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
 
     '''
+    additional_params = network_kwargs["network_kwargs"]
     from baselines import logger
 
     set_global_seeds(seed)
+
+    if "LR_ANNEALING" in additional_params.keys():
+        lr_reduction_factor = additional_params["LR_ANNEALING"]
+        start_lr = lr
+        lr = lambda prop: (start_lr / lr_reduction_factor) + (start_lr - (start_lr / lr_reduction_factor)) * prop # Anneals linearly from lr to lr/red factor
 
     if isinstance(lr, float): lr = constfn(lr)
     else: assert callable(lr)
@@ -87,7 +93,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     total_timesteps = int(total_timesteps)
 
     policy = build_policy(env, network, **network_kwargs)
-    additional_params = network_kwargs["network_kwargs"]
+    
     bestrew = 0
     # Get the nb of env
     nenvs = env.num_envs
@@ -147,7 +153,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         eprewmean = safemean([epinfo['r'] for epinfo in epinfos])
         rew_per_step = eprewmean / eplenmean
 
-        print("Curr reward per step", rew_per_step)
+        print("Curr learning rate {} \t Curr reward per step {}".format(lrnow, rew_per_step))
 
         if rew_per_step > best_rew_per_step and early_stopping:
             # Avoid updating best model at first iteration because the means might be a bit off because
@@ -270,6 +276,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 # Save best model
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
+                    if additional_params["OTHER_AGENT_TYPE"] == "bc" and additional_params["SELF_PLAY_RND_GOAL"] != 0 and env.self_play_randomization > 0:
+                        # Don't save best model if still doing self play
+                        continue
                     from hr_coordination.ppo.ppo import save_ppo_model
                     print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                     save_ppo_model(model, "{}seed{}/best".format(
