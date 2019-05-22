@@ -276,7 +276,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 # Save best model
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
-                    if additional_params["OTHER_AGENT_TYPE"] == "bc" and additional_params["SELF_PLAY_RND_GOAL"] != 0 and env.self_play_randomization > 0:
+                    if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and additional_params["SELF_PLAY_RND_GOAL"] != 0 and env.self_play_randomization > 0:
                         # Don't save best model if still doing self play
                         pass
                     else:
