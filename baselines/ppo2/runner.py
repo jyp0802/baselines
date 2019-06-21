@@ -50,6 +50,7 @@ class Runner(AbstractEnvRunner):
                     if self.env.other_agent_true:
                         p_self_play = self.env.self_play_randomization
 
+                        # Randomize at either the trajectory level or the individual timestep level
                         if self.env.trajectory_sp:
 
                             if sum(sp_envs_bools) != num_envs: # Compute BC actions if some num of envs not running in BC
@@ -85,18 +86,17 @@ class Runner(AbstractEnvRunner):
                                 self_play_actions, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
                                 self_play_bools = np.random.random(num_envs) < p_self_play
 
-                                # Currently randomizes at the step level, might want to randomize at the trajectory level
-                                # That is harder to do though, as requires dealing with dones
                                 for i in range(num_envs):
                                     is_self_play_action = self_play_bools[i]
                                     if is_self_play_action:
                                         other_agent_actions[i] = self_play_actions[i]
 
-                    elif self.env.other_agent_bc:
-                        # Parallelise actions with direct action, using the featurization function
-                        featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
-                        player_featurizes_states = [s[idx] for s, idx in zip(featurized_states, self.other_agent_idx)]
-                        other_agent_actions = self.env.other_agent.direct_policy(player_featurizes_states, sampled=True, no_wait=True)
+                    # NOTE: This has been discontinued as now using .other_agent_true takes about the same amount of time
+                    # elif self.env.other_agent_bc:
+                    #     # Parallelise actions with direct action, using the featurization function
+                    #     featurized_states = [self.env.mdp.featurize_state(s, self.env.mlp) for s in self.curr_state]
+                    #     player_featurizes_states = [s[idx] for s, idx in zip(featurized_states, self.other_agent_idx)]
+                    #     other_agent_actions = self.env.other_agent.direct_policy(player_featurizes_states, sampled=True, no_wait=True)
                     else:
                         other_agent_actions = self.env.other_agent.direct_action(self.obs1)
 
@@ -123,10 +123,9 @@ class Runner(AbstractEnvRunner):
                 both_obs_and_state_and_other_idx, rewards, self.dones, infos = self.env.step(joint_action)
 
                 # PROCESSING TODO: clean, same as runner in /common
-                ########## START CLEAN UP ######## 
+                ##### STARTING HERE: This portion of the code can most likely be improved a lot
                 transp_shape = list(range(len(both_obs_and_state_and_other_idx.shape)))
-                transp_shape[0] = 1
-                transp_shape[1] = 0
+                transp_shape[0], transp_shape[1] = 1, 0
                 both_obs_and_state_and_other_idx = np.transpose(both_obs_and_state_and_other_idx, transp_shape)
                 
                 both_obs, state_and_other_idx = both_obs_and_state_and_other_idx
@@ -143,17 +142,11 @@ class Runner(AbstractEnvRunner):
                     obs.append(sub_obs)
 
                 obs0, obs1 = obs
-                # print(np.array(obs0).shape)
-                # print(np.array(obs1).shape)
-                # # both_obs = np.hstack(both_obs)
-                
-                # print([np.array(a).shape for a in both_obs])
-                # print(both_obs.shape)
-                # print(both_obs)
-                self.obs0[:] = np.array(obs0) #np.concatenate(both_obs[:,0])
-                self.obs1[:] = np.array(obs1) #np.concatenate(both_obs[:,1])
+
+                self.obs0[:] = np.array(obs0)
+                self.obs1[:] = np.array(obs1)
                 self.curr_state, self.other_agent_idx = state_and_other_idx[:, 0], state_and_other_idx[:, 1]
-                ##################### END CLEAN UP ######
+                ##### ENDING here
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
 
@@ -198,22 +191,3 @@ def sf01(arr):
     """
     s = arr.shape
     return arr.swapaxes(0, 1).reshape(s[0] * s[1], *s[2:])
-
-
-
-def switch_player(obs):
-    assert len(obs.shape) == 3
-    obs = obs.copy()
-    obs = switch_layers(obs, 0, 1)
-    obs = switch_layers(obs, 2, 6)
-    obs = switch_layers(obs, 3, 7)
-    obs = switch_layers(obs, 4, 8)
-    obs = switch_layers(obs, 5, 9)
-    return obs
-
-def switch_layers(obs, idx0, idx1):
-    obs = obs.copy()
-    tmp = obs[:,:,idx0].copy()
-    obs[:,:,idx0] = obs[:,:,idx1]
-    obs[:,:,idx1] = tmp
-    return obs

@@ -79,7 +79,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     additional_params = network_kwargs["network_kwargs"]
     from baselines import logger
 
-    set_global_seeds(seed)
+    # set_global_seeds(seed) We deal with seeds upstream
 
     if "LR_ANNEALING" in additional_params.keys():
         lr_reduction_factor = additional_params["LR_ANNEALING"]
@@ -135,7 +135,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     nupdates = total_timesteps//nbatch
     print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
-        assert nbatch % nminibatches == 0
+        assert nbatch % nminibatches == 0, "Have {} total batch size and want {} minibatches, can't split evenly".format(nbatch, nminibatches)
         # Start timer
         tstart = time.perf_counter()
         frac = 1.0 - (update - 1.0) / nupdates
@@ -182,7 +182,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     mbinds = inds[start:end]
                     slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
                     mblossvals.append(model.train(lrnow, cliprangenow, *slices))
-                    # TODO: could look into assessing size of gradients
+
         else: # recurrent version
             assert nenvs % nminibatches == 0
             envsperbatch = nenvs // nminibatches
@@ -204,8 +204,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         tnow = time.perf_counter()
         # Calculate the fps (frame per second)
         fps = int(nbatch / (tnow - tstart))
-
-        # TODO: Clean all of the following up a bit
 
         if update % log_interval == 0 or update == 1:
             # Calculates if value function is a good predicator of the returns (ev > 1)
@@ -274,28 +272,23 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     env.update_reward_shaping_param(curr_reward_shaping)
                     print("Current reward shaping", curr_reward_shaping)
 
-                # Save best model
+                # Save/overwrite best model if past a certain threshold
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
+                    # Don't save best model if still doing some self play and it's supposed to be a BC model
                     if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and additional_params["SELF_PLAY_RND_GOAL"] != 0 and env.self_play_randomization > 0:
-                        # Don't save best model if still doing self play
                         pass
-                    else:
-                        from hr_coordination.ppo.ppo import save_ppo_model
-                        print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
-                        save_ppo_model(model, "{}seed{}/best".format(
-                            additional_params["SAVE_DIR"],
-                            additional_params["CURR_SEED"])
-                        )
-                        bestrew = max(ep_sparse_rew_mean, bestrew)
+                    
+                    from hr_coordination.ppo.ppo import save_ppo_model
+                    print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
+                    save_ppo_model(model, "{}seed{}/best".format(
+                        additional_params["SAVE_DIR"],
+                        additional_params["CURR_SEED"])
+                    )
+                    bestrew = max(ep_sparse_rew_mean, bestrew)
 
                 if additional_params["SELF_PLAY_RND_GOAL"] != 0:
                     if type(additional_params["SELF_PLAY_RND_GOAL"]) is not list:
-                        # Sigmoid self-play schedule
-
-                        # Evaluate self-play
-                        # env.self_play_randomization = 1
-                        # _, _, _, _, _, _, _, epinfos_selfplay = runner.run()
-                        # eprewmean_selfplay = safemean([epinfo['sparse_r'] for epinfo in epinfos_selfplay])
+                        # Sigmoid self-play schedule based on current performance (not recommended)
                         curr_reward = ep_sparse_rew_mean
 
                         rew_target = additional_params["SELF_PLAY_RND_GOAL"]

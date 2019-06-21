@@ -15,9 +15,10 @@ class AbstractEnvRunner(ABC):
             self.obs1 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
 
             both_obs_and_state_and_other_idx = env.reset()
+
+            ##### STARTING HERE: This portion of the code can most likely be improved a lot
             transp_shape = list(range(len(both_obs_and_state_and_other_idx.shape)))
-            transp_shape[0] = 1
-            transp_shape[1] = 0
+            transp_shape[0], transp_shape[1] = 1, 0
             both_obs_and_state_and_other_idx = np.transpose(both_obs_and_state_and_other_idx, transp_shape)
             
             both_obs, state_and_other_idx = both_obs_and_state_and_other_idx
@@ -34,17 +35,11 @@ class AbstractEnvRunner(ABC):
                 obs.append(sub_obs)
 
             obs0, obs1 = obs
-            # print(np.array(obs0).shape)
-            # print(np.array(obs1).shape)
-            # # both_obs = np.hstack(both_obs)
-            
-            # print([np.array(a).shape for a in both_obs])
-            # print(both_obs.shape)
-            # print(both_obs)
 
-            self.obs0[:] = np.array(obs0) #np.concatenate(both_obs[:,0])
-            self.obs1[:] = np.array(obs1) #np.concatenate(both_obs[:,1])
+            self.obs0[:] = np.array(obs0)
+            self.obs1[:] = np.array(obs1)
             self.curr_state, self.other_agent_idx = state_and_other_idx[:, 0], state_and_other_idx[:, 1]
+            ##### ENDING here
         else:
             self.obs[:] = env.reset()
         self.nsteps = nsteps
