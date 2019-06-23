@@ -80,8 +80,7 @@ class Runner(AbstractEnvRunner):
                                 other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
                                 other_agent_actions = [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
 
-                            ####### Naive non-parallelized way of getting actions for other ########
-                            
+                            # Naive non-parallelized way of getting actions for other
                             if p_self_play > 0:
                                 self_play_actions, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
                                 self_play_bools = np.random.random(num_envs) < p_self_play
