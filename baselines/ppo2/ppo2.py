@@ -149,7 +149,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         if eval_env is not None:
             eval_obs, eval_returns, eval_masks, eval_actions, eval_values, eval_neglogpacs, eval_states, eval_epinfos = eval_runner.run() #pylint: disable=E0632
 
-        eplenmean = safemean([epinfo['l'] for epinfo in epinfos])
+        eplenmean = safemean([epinfo['ep_length'] for epinfo in epinfos])
         eprewmean = safemean([epinfo['r'] for epinfo in epinfos])
         rew_per_step = eprewmean / eplenmean
 
@@ -216,16 +216,16 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv("explained_variance", float(ev))
             
             eprewmean = safemean([epinfo['r'] for epinfo in epinfobuf])
-            ep_dense_rew_mean = safemean([epinfo['dense_r'] for epinfo in epinfobuf])
-            ep_sparse_rew_mean = safemean([epinfo['sparse_r'] for epinfo in epinfobuf])
-            eplenmean = safemean([epinfo['l'] for epinfo in epinfobuf])
+            ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
+            ep_sparse_rew_mean = safemean([epinfo['ep_sparse_r'] for epinfo in epinfobuf])
+            eplenmean = safemean([epinfo['ep_length'] for epinfo in epinfobuf])
             run_info['eprewmean'].append(eprewmean)
             run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
             run_info['ep_sparse_rew_mean'].append(ep_sparse_rew_mean)
             run_info['eplenmean'].append(eplenmean)
             run_info['explained_variance'].append(float(ev))
 
-            logger.logkv('true_eprew', safemean([epinfo['sparse_r'] for epinfo in epinfobuf]))
+            logger.logkv('true_eprew', safemean([epinfo['ep_sparse_r'] for epinfo in epinfobuf]))
             logger.logkv('eprewmean', eprewmean)
             logger.logkv('eplenmean', eplenmean)
             if eval_env is not None:
@@ -249,7 +249,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
-                from hr_coordination.utils import save_dict_to_file
+                from overcooked_gridworld.utils import save_dict_to_file
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
 
                 # Linear annealing of reward shaping
@@ -328,8 +328,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
-            from hr_coordination.agents.agent import AgentPair
-            from hr_coordination.agents.benchmarking import AgentEvaluator
+            from overcooked_gridworld.agents.agent import AgentPair
+            from overcooked_gridworld.agents.benchmarking import AgentEvaluator
             from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_agent_from_model
             print(additional_params["SAVE_DIR"])
 
