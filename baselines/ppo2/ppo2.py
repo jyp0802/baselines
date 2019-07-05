@@ -328,21 +328,24 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
+            from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+            from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
             from overcooked_ai_py.agents.agent import AgentPair
             from overcooked_ai_py.agents.benchmarking import AgentEvaluator
-            from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_agent_from_model
+            from hr_coordination.pbt.pbt_utils import get_agent_from_model
             print(additional_params["SAVE_DIR"])
 
-            overcooked_env = setup_mdp_env(display=False, **additional_params)
+            mdp = OvercookedGridworld.from_layout_name(**additional_params["mdp_params"])
+            overcooked_env = OvercookedEnv(mdp, **additional_params["env_params"])
             agent = get_agent_from_model(model, additional_params["SIM_THREADS"], is_joint_action=(run_type == "joint_ppo"))
-            agent.set_mdp(overcooked_env.mdp)
+            agent.set_mdp(mdp)
 
             if run_type == "ppo":
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
                     agent_pair = AgentPair(agent, agent)
                 else:
                     print("PPO agent on index 0:")
-                    env.other_agent.set_mdp(overcooked_env.mdp)
+                    env.other_agent.set_mdp(mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
                     trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, displayUntil=100)
                     print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards) 
