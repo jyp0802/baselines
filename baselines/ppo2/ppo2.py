@@ -249,7 +249,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
-                from overcooked_gridworld.utils import save_dict_to_file
+                from overcooked_ai_py.utils import save_dict_to_file
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
 
                 # Linear annealing of reward shaping
@@ -328,8 +328,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
-            from overcooked_gridworld.agents.agent import AgentPair
-            from overcooked_gridworld.agents.benchmarking import AgentEvaluator
+            from overcooked_ai_py.agents.agent import AgentPair
+            from overcooked_ai_py.agents.benchmarking import AgentEvaluator
             from hr_coordination.pbt.pbt_utils import setup_mdp_env, get_agent_from_model
             print(additional_params["SAVE_DIR"])
 
