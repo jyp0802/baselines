@@ -54,7 +54,7 @@ class Runner(AbstractEnvRunner):
 
                         if sum(sp_envs_bools) != num_envs: # Compute BC actions if some num of envs not running in BC
                             # Get actions through the action method of the agent
-                            from hr_coordination.mdp.overcooked_mdp import Action
+                            from overcooked_gridworld.mdp.actions import Action
                             other_agent_actions_bc = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
                             other_agent_actions_bc = [Action.ACTION_TO_INDEX[a] for a in other_agent_actions_bc]
 
@@ -75,7 +75,7 @@ class Runner(AbstractEnvRunner):
 
                         if p_self_play < 1:
                             # Get actions through the action method of the agent
-                            from hr_coordination.mdp.overcooked_mdp import Action
+                            from overcooked_gridworld.mdp.actions import Action
                             other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
                             other_agent_actions = [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
 
