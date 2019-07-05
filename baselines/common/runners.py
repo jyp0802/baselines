@@ -14,32 +14,12 @@ class AbstractEnvRunner(ABC):
             self.obs0 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
             self.obs1 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
 
-            both_obs_and_state_and_other_idx = env.reset()
-
-            ##### STARTING HERE: This portion of the code can most likely be improved a lot
-            transp_shape = list(range(len(both_obs_and_state_and_other_idx.shape)))
-            transp_shape[0], transp_shape[1] = 1, 0
-            both_obs_and_state_and_other_idx = np.transpose(both_obs_and_state_and_other_idx, transp_shape)
-            
-            both_obs, state_and_other_idx = both_obs_and_state_and_other_idx
-            state_and_other_idx = np.array(state_and_other_idx)
-            both_obs = np.array(both_obs)
-
-            threads, players = np.array(both_obs).shape
-            
-            obs = []
-            for y in range(players):
-                sub_obs = []
-                for x in range(threads):
-                    sub_obs.append(both_obs[x][y])
-                obs.append(sub_obs)
-
-            obs0, obs1 = obs
-
-            self.obs0[:] = np.array(obs0)
-            self.obs1[:] = np.array(obs1)
-            self.curr_state, self.other_agent_idx = state_and_other_idx[:, 0], state_and_other_idx[:, 1]
-            ##### ENDING here
+            obs = env.reset()
+            both_obs = obs["both_agent_obs"]
+            self.obs0[:] = both_obs[:, 0, :, :]
+            self.obs1[:] = both_obs[:, 1, :, :]
+            self.curr_state = obs["overcooked_state"]
+            self.other_agent_idx = obs["other_agent_env_idx"]
         else:
             self.obs[:] = env.reset()
         self.nsteps = nsteps

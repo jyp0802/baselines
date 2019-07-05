@@ -50,7 +50,11 @@ class DummyVecEnv(VecEnv):
 
             obs, self.buf_rews[e], self.buf_dones[e], self.buf_infos[e] = self.envs[e].step(action)
             if self.buf_dones[e]:
-                obs = self.envs[e].reset()
+                stuff = self.envs[e].reset()
+                print("SIAFHFIS", stuff)
+                obs = stuff[0]
+                infos = self.buf_infos[e]
+                print(obs.shape, self.buf_infos[e])
             self._save_obs(e, obs)
         return (self._obs_from_buf(), np.copy(self.buf_rews), np.copy(self.buf_dones),
                 self.buf_infos.copy())
