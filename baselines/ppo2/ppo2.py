@@ -337,7 +337,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             mdp = OvercookedGridworld.from_layout_name(**additional_params["mdp_params"])
             overcooked_env = OvercookedEnv(mdp, **additional_params["env_params"])
-            agent = get_agent_from_model(model, additional_params["SIM_THREADS"], is_joint_action=(run_type == "joint_ppo"))
+            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
             agent.set_mdp(mdp)
 
             if run_type == "ppo":
