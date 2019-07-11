@@ -275,7 +275,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 # Save/overwrite best model if past a certain threshold
                 if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
                     # Don't save best model if still doing some self play and it's supposed to be a BC model
-                    if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and additional_params["SELF_PLAY_RND_GOAL"] != 0 and env.self_play_randomization > 0:
+                    if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and additional_params["SELF_PLAY_HORIZON"] != 0 and env.self_play_randomization > 0:
                         pass
                     
                     from hr_coordination.ppo.ppo import save_ppo_model
@@ -286,12 +286,17 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     )
                     bestrew = max(ep_sparse_rew_mean, bestrew)
 
-                if additional_params["SELF_PLAY_RND_GOAL"] != 0:
-                    if type(additional_params["SELF_PLAY_RND_GOAL"]) is not list:
+                self_play_horizon = additional_params["SELF_PLAY_HORIZON"]
+
+                # If not sp run, and horizon is not None, 
+                # vary amount of self play over time, either with a sigmoidal feedback loop 
+                # or with a fixed piecewise linear schedule.
+                if additional_params["OTHER_AGENT_TYPE"] != "sp" and self_play_horizon is not None:
+                    if type(self_play_horizon) is not list:
                         # Sigmoid self-play schedule based on current performance (not recommended)
                         curr_reward = ep_sparse_rew_mean
 
-                        rew_target = additional_params["SELF_PLAY_RND_GOAL"]
+                        rew_target = self_play_horizon
                         shift = rew_target / 2
                         t = (1 / rew_target) * 10
                         fn = lambda x: -1 * (np.exp(t * (x - shift)) / (1 + np.exp(t * (x - shift)))) + 1
@@ -299,11 +304,12 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         env.self_play_randomization = fn(curr_reward)
                         print("Current self-play randomization", env.self_play_randomization)
                     else:
+                        assert len(self_play_horizon) == 2
                         # Piecewise linear self-play schedule
 
                         # self_play_thresh: when we should stop doing 100% self-play
                         # self_play_timeline: when we should reach doing 0% self-play
-                        self_play_thresh, self_play_timeline = additional_params["SELF_PLAY_RND_GOAL"]
+                        self_play_thresh, self_play_timeline = self_play_horizon
 
                         def fn(x):
                             if self_play_thresh != 0 and self_play_timeline - (self_play_timeline / self_play_thresh) * x > 1:

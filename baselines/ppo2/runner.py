@@ -56,20 +56,21 @@ class Runner(AbstractEnvRunner):
 
                 import time
                 current_simulation_time = time.time()
-            
-                p_self_play = self.env.self_play_randomization
 
                 # Randomize at either the trajectory level or the individual timestep level
                 if self.env.trajectory_sp:
 
-                    if sum(sp_envs_bools) != num_envs: # Compute BC actions if some num of envs not running in BC
-                        # Get actions through the action method of the agent
-                        
+                    # If there are environments selected to not run in SP, generate actions
+                    # for the other agent, otherwise we skip this step.
+                    if sum(sp_envs_bools) != num_envs:
                         other_agent_actions_bc = other_agent_action()
 
-                    if sum(sp_envs_bools) != 0: # Compute SP actions if some num of envs is supposed to run in SP
+                    # If there are environments selected to run in SP, generate self-play actions
+                    if sum(sp_envs_bools) != 0:
                         other_agent_actions_sp, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
 
+                    # Select other agent actions for each environment depending on whether it was selected
+                    # for self play or not
                     other_agent_actions = []
                     for i in range(num_envs):
                         if sp_envs_bools[i]:
@@ -82,14 +83,14 @@ class Runner(AbstractEnvRunner):
                 else:
                     other_agent_actions = np.zeros_like(self.curr_state)
 
-                    if p_self_play < 1:
+                    if self.env.self_play_randomization < 1:
                         # Get actions through the action method of the agent
                         other_agent_actions = other_agent_action()
 
                     # Naive non-parallelized way of getting actions for other
-                    if p_self_play > 0:
+                    if self.env.self_play_randomization > 0:
                         self_play_actions, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
-                        self_play_bools = np.random.random(num_envs) < p_self_play
+                        self_play_bools = np.random.random(num_envs) < self.env.self_play_randomization
 
                         for i in range(num_envs):
                             is_self_play_action = self_play_bools[i]
