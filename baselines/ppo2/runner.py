@@ -39,8 +39,18 @@ class Runner(AbstractEnvRunner):
         from overcooked_ai_py.mdp.actions import Action
 
         def other_agent_action():
+            # To determine the agent is a human model:
+            #TODO: More elegant way to do this:
+            try:
+                self.env.other_agent.human_model
+            except AttributeError:
+                self.env.other_agent.human_model = False
+
             if self.env.other_agent_bc_model:
                 other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
+                return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
+            elif self.env.other_agent.human_model:
+                other_agent_actions = self.env.other_agent.multiple_thread_action(self.curr_state)
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
