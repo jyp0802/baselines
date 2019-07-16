@@ -338,7 +338,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
             from overcooked_ai_py.agents.agent import AgentPair
             from overcooked_ai_py.agents.benchmarking import AgentEvaluator
-            from hr_coordination.pbt.pbt_utils import get_agent_from_model
+            from hr_coordination.baselines_utils import get_agent_from_model
             print(additional_params["SAVE_DIR"])
 
             mdp = OvercookedGridworld.from_layout_name(**additional_params["mdp_params"])

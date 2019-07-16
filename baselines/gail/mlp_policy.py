@@ -93,7 +93,7 @@ class CNNDiscretePolicy(object):
 
         ob = U.get_placeholder(name="ob", dtype=tf.float32, shape=[sequence_length] + list(ob_space.shape))
 
-        from hr_coordination.pbt.pbt_utils import conv_network_fn
+        from hr_coordination.baselines_utils import conv_network_fn
         last_out = conv_network_fn(**kwargs)(ob)
         
         self.vpred = dense(last_out, 1, "vffinal", weight_init=U.normc_initializer(1.0))[:, 0]
