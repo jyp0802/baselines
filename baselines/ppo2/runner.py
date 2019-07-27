@@ -40,7 +40,7 @@ class Runner(AbstractEnvRunner):
 
         def other_agent_action():
             if self.env.use_action_method:
-                other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
+                other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
