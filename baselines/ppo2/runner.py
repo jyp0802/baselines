@@ -39,7 +39,7 @@ class Runner(AbstractEnvRunner):
         from overcooked_ai_py.mdp.actions import Action
 
         def other_agent_action():
-            if self.env.other_agent_bc_model:
+            if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
             else:
