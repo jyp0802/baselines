@@ -353,7 +353,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     print("PPO agent on index 0:")
                     env.other_agent.set_mdp(mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
-                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.get_rollouts(agent_pair, display=True, display_until=100)
+                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
+                    overcooked_env.reset()
+                    agent_pair.reset()
                     print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
                     
                     print("PPO agent on index 1:")
@@ -362,7 +364,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             else:
                 agent_pair = AgentPair(agent)
             
-            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.get_rollouts(agent_pair, display=True, display_until=100)
+            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
+            overcooked_env.reset()
+            agent_pair.reset()
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
             print(additional_params["SAVE_DIR"])
 
