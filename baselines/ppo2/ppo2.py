@@ -280,7 +280,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
                     else:    
-                        from hr_coordination.ppo.ppo import save_ppo_model
+                        from human_aware_rl.ppo.ppo import save_ppo_model
                         print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                         save_ppo_model(model, "{}seed{}/best".format(
                             additional_params["SAVE_DIR"],
@@ -338,7 +338,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
             from overcooked_ai_py.agents.agent import AgentPair
             from overcooked_ai_py.agents.benchmarking import AgentEvaluator
-            from hr_coordination.baselines_utils import get_agent_from_model
+            from human_aware_rl.baselines_utils import get_agent_from_model
             print(additional_params["SAVE_DIR"])
 
             mdp = OvercookedGridworld.from_layout_name(**additional_params["mdp_params"])
