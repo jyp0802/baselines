@@ -339,19 +339,22 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             from overcooked_ai_py.agents.agent import AgentPair
             from overcooked_ai_py.agents.benchmarking import AgentEvaluator
             from human_aware_rl.baselines_utils import get_agent_from_model
+            from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
             print(additional_params["SAVE_DIR"])
 
-            mdp = OvercookedGridworld.from_layout_name(**additional_params["mdp_params"])
-            overcooked_env = OvercookedEnv(mdp, **additional_params["env_params"])
+            mdp_params = additional_params["mdp_params"]
+            mdp_gen_params = additional_params["mdp_generation_params"]
+            mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
+            overcooked_env = OvercookedEnv(mdp=mdp_fn, **additional_params["env_params"])
             agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
-            agent.set_mdp(mdp)
+            agent.set_mdp(overcooked_env.mdp)
 
             if run_type == "ppo":
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
                     agent_pair = AgentPair(agent, agent)
                 else:
                     print("PPO agent on index 0:")
-                    env.other_agent.set_mdp(mdp)
+                    env.other_agent.set_mdp(overcooked_env.mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
                     trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
                     overcooked_env.reset()
