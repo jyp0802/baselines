@@ -252,6 +252,10 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 from overcooked_ai_py.utils import save_dict_to_file
                 save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
 
+                if additional_params["TRACK_TUNE"]:
+                    from ray import tune
+                    tune.track.log(sparse_reward=ep_sparse_rew_mean)
+
                 # Linear annealing of reward shaping
                 if additional_params["REW_SHAPING_HORIZON"] != 0:
                     # Piecewise linear annealing schedule
