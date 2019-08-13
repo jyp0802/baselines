@@ -211,23 +211,30 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             ev = explained_variance(values, returns)
             logger.logkv("serial_timesteps", update*nsteps)
             logger.logkv("nupdates", update)
-            logger.logkv("total_timesteps", update*nbatch)
+
+            timesteps_passed = update*nbatch
+            logger.logkv("total_timesteps", timesteps_passed)
+            run_info['total_timesteps'].append(timesteps_passed)
+
             logger.logkv("fps", fps)
             logger.logkv("explained_variance", float(ev))
+            run_info['explained_variance'].append(float(ev))
             
             eprewmean = safemean([epinfo['r'] for epinfo in epinfobuf])
-            ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
-            ep_sparse_rew_mean = safemean([epinfo['ep_sparse_r'] for epinfo in epinfobuf])
-            eplenmean = safemean([epinfo['ep_length'] for epinfo in epinfobuf])
-            run_info['eprewmean'].append(eprewmean)
-            run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
-            run_info['ep_sparse_rew_mean'].append(ep_sparse_rew_mean)
-            run_info['eplenmean'].append(eplenmean)
-            run_info['explained_variance'].append(float(ev))
-
-            logger.logkv('true_eprew', safemean([epinfo['ep_sparse_r'] for epinfo in epinfobuf]))
             logger.logkv('eprewmean', eprewmean)
+            run_info['ep_perceived_rew_mean'].append(eprewmean)
+
+            ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
+            run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
+
+            ep_sparse_rew_mean = safemean([epinfo['ep_sparse_r'] for epinfo in epinfobuf])
+            logger.logkv('ep_sparse_rew_mean', safemean([epinfo['ep_sparse_r'] for epinfo in epinfobuf]))
+            run_info['ep_sparse_rew_mean'].append(ep_sparse_rew_mean)
+            
+            eplenmean = safemean([epinfo['ep_length'] for epinfo in epinfobuf])
             logger.logkv('eplenmean', eplenmean)
+            run_info['eplenmean'].append(eplenmean)
+
             if eval_env is not None:
                 logger.logkv('eval_eprewmean', safemean([epinfo['r'] for epinfo in eval_epinfobuf]) )
                 logger.logkv('eval_eplenmean', safemean([epinfo['l'] for epinfo in eval_epinfobuf]) )
@@ -254,7 +261,11 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 if additional_params["TRACK_TUNE"]:
                     from ray import tune
-                    tune.track.log(sparse_reward=ep_sparse_rew_mean, dense_reward=ep_dense_rew_mean)
+                    tune.track.log(
+                        sparse_reward=ep_sparse_rew_mean, 
+                        dense_reward=ep_dense_rew_mean, 
+                        timesteps_total=timesteps_passed
+                    )
 
                 # Linear annealing of reward shaping
                 if additional_params["REW_SHAPING_HORIZON"] != 0:
