@@ -254,7 +254,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 if additional_params["TRACK_TUNE"]:
                     from ray import tune
-                    tune.track.log(sparse_reward=ep_sparse_rew_mean)
+                    tune.track.log(sparse_reward=ep_sparse_rew_mean, dense_reward=ep_dense_rew_mean)
 
                 # Linear annealing of reward shaping
                 if additional_params["REW_SHAPING_HORIZON"] != 0:
