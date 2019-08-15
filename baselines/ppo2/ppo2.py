@@ -366,7 +366,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             if run_type == "ppo":
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
-                    agent_pair = AgentPair(agent, agent)
+                    agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
                 else:
                     print("PPO agent on index 0:")
                     env.other_agent.set_mdp(overcooked_env.mdp)
