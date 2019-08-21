@@ -51,6 +51,7 @@ class Runner(AbstractEnvRunner):
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
             elif self.env.other_agent.human_model:
                 other_agent_actions = self.env.other_agent.multiple_thread_action(self.curr_state)
+                assert self.env.other_agent.agent_index == 1
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
