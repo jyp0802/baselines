@@ -337,8 +337,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         env.self_play_randomization = fn(curr_timestep)
                         print("Current self-play randomization", env.self_play_randomization)
 
-                
-
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
             os.makedirs(checkdir, exist_ok=True)
@@ -358,9 +356,10 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print(additional_params["SAVE_DIR"])
 
             mdp_params = additional_params["mdp_params"]
+            env_params = additional_params["env_params"]
             mdp_gen_params = additional_params["mdp_generation_params"]
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
-            overcooked_env = OvercookedEnv(mdp=mdp_fn, **additional_params["env_params"])
+            overcooked_env = OvercookedEnv(mdp=mdp_fn, **env_params)
             agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
             agent.set_mdp(overcooked_env.mdp)
 
@@ -387,6 +386,15 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             agent_pair.reset()
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
             print(additional_params["SAVE_DIR"])
+
+        num_entropy_iter = nupdates // 10
+        if update % num_entropy_iter == 0 or update == nupdates - 1:
+            ae = AgentEvaluator(mdp_params, env_params)
+            _ = ae.evaluate_agent_pair(agent_pair, num_games=100)
+            entropies = AgentEvaluator.trajectory_entropy(_)
+            run_info["policy_entropy"].append(entropies)
+            avg_rew_and_se = AgentEvaluator.trajectory_mean_and_se_rewards(_)
+            run_info["policy_reward"].append(avg_rew_and_se[0])
 
     if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')
