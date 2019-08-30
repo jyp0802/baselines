@@ -39,20 +39,37 @@ class Runner(AbstractEnvRunner):
         from overcooked_ai_py.mdp.actions import Action
 
         def other_agent_action():
-            # To determine the agent is a human model:
-            #TODO: More elegant way to do this:
-            try:
-                self.env.other_agent.human_model
-            except AttributeError:
-                self.env.other_agent.human_model = False
+
+            # # OLD: To determine the agent is a human model:
+            # try:
+            #     self.env.other_agent[0].human_model
+            # except TypeError:
+            #     self.env.other_agent[0].human_model = False
 
             if self.env.other_agent_bc_model:
                 other_agent_actions = self.env.other_agent.action(self.curr_state, self.other_agent_idx)
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
-            elif self.env.other_agent.human_model:
-                other_agent_actions = self.env.other_agent.multiple_thread_action(self.curr_state)
-                assert self.env.other_agent.agent_index == 1
+
+            elif self.env.other_agent_hm == True:
+
+                # Check the index for each agent matches with self.other_agent_idx. If not, then set the index. Best
+                # to do this here, because the indices are randomised [between episodes?], so putting this here
+                # ensures the indices are always correct.
+                #TODO: Better solution is to reset the HMs each time the env is reset, but this isn't straightforward
+                # (each HM could be reset whenever any index changes (signifying a reset), but this isn't so rigorous
+                for i in range(self.other_agent_idx.__len__()):
+                    if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                        self.env.other_agent[i].agent_index = self.other_agent_idx[i]
+                        self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
+
+                # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
+                other_agent_actions = []
+                for i in range(self.other_agent_idx.__len__()):
+                    assert self.env.other_agent[i].agent_index == self.other_agent_idx[i]
+                    other_agent_actions.append(self.env.other_agent[i].action(self.curr_state[i]))
+
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
+
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
                 return other_agent_actions
