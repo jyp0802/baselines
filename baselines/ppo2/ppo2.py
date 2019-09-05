@@ -344,13 +344,13 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print('Saving to', savepath)
             model.save(savepath)
         
+        from overcooked_ai_py.agents.benchmarking import AgentEvaluator
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
             from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
             from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
             from overcooked_ai_py.agents.agent import AgentPair
-            from overcooked_ai_py.agents.benchmarking import AgentEvaluator
             from human_aware_rl.baselines_utils import get_agent_from_model
             from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
             print(additional_params["SAVE_DIR"])
@@ -387,14 +387,16 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
             print(additional_params["SAVE_DIR"])
 
-        num_entropy_iter = nupdates // 10
-        if update % num_entropy_iter == 0 or update == nupdates - 1:
-            ae = AgentEvaluator(mdp_params, env_params)
-            _ = ae.evaluate_agent_pair(agent_pair, num_games=100)
-            entropies = AgentEvaluator.trajectory_entropy(_)
-            run_info["policy_entropy"].append(entropies)
-            avg_rew_and_se = AgentEvaluator.trajectory_mean_and_se_rewards(_)
-            run_info["policy_reward"].append(avg_rew_and_se[0])
+        # num_entropy_iter = nupdates // 10
+        # if update % num_entropy_iter == 0 or update == nupdates - 1:
+        #     mdp_params = additional_params["mdp_params"]
+        #     env_params = additional_params["env_params"]
+        #     ae = AgentEvaluator(mdp_params, env_params)
+        #     _ = ae.evaluate_agent_pair(agent_pair, num_games=100)
+        #     entropies = AgentEvaluator.trajectory_entropy(_)
+        #     run_info["policy_entropy"].append(entropies)
+        #     avg_rew_and_se = AgentEvaluator.trajectory_mean_and_se_rewards(_)
+        #     run_info["policy_reward"].append(avg_rew_and_se[0])
 
     if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')
@@ -404,6 +406,5 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)
-
 
 
