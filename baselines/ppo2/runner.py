@@ -66,7 +66,7 @@ class Runner(AbstractEnvRunner):
 
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
-                return other_agent_action
+                return other_agent_actions
             
 
         for _ in range(self.nsteps):
