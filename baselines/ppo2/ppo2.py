@@ -289,8 +289,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
 
-                # Save/overwrite best model if past a certain threshold
-                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
+                # Save/overwrite best model
+                if ep_sparse_rew_mean > bestrew:
                     # Don't save best model if still doing some self play and it's supposed to be a BC model
                     if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
