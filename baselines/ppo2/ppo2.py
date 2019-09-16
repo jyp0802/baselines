@@ -94,7 +94,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     policy = build_policy(env, network, **network_kwargs)
     
-    bestrew = 0
+    bestrew = -np.Inf
     # Get the nb of env
     nenvs = env.num_envs
 
