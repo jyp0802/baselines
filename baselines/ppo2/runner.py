@@ -123,6 +123,7 @@ class Runner(AbstractEnvRunner):
             # Infos contains a ton of useful informations
             if overcooked:
                 obs, rewards, self.dones, infos = self.env.step(joint_action)
+                # print("REWS", rewards, np.mean(rewards))
                 both_obs = obs["both_agent_obs"]
                 self.obs0[:] = both_obs[:, 0, :, :]
                 self.obs1[:] = both_obs[:, 1, :, :]
