@@ -224,9 +224,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv('eprewmean', eprewmean)
             run_info['ep_perceived_rew_mean'].append(eprewmean)
 
-            ood_penalty = safemean([epinfo['ood_penalty'] for epinfo in epinfobuf])
-            logger.logkv('ood_penalty', ood_penalty)
-            run_info['ood_penalty'].append(ood_penalty)
+            # ood_penalty = safemean([epinfo['ood_penalty'] for epinfo in epinfobuf])
+            # logger.logkv('ood_penalty', ood_penalty)
+            # run_info['ood_penalty'].append(ood_penalty)
 
             ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
             run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)

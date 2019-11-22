@@ -103,12 +103,6 @@ class SubprocVecEnv(VecEnv):
         assert not self.closed, "Trying to operate on a SubprocVecEnv after calling close()"
 
     def __del__(self):
-        print("DELETING VENV INTERNAl")
-        if not self.closed:
-            self.close()
-
-    def force_del(self):
-        print("DELETING VENV")
         if not self.closed:
             self.close()
 
