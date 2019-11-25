@@ -117,7 +117,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     if load_path is not None:
         model.load(load_path)
-    # Instantiate the runner object
+    # Instantiate the runner object:
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
     if eval_env is not None:
         eval_runner = Runner(env = eval_env, model = model, nsteps = nsteps, gamma = gamma, lam= lam)
