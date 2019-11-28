@@ -289,7 +289,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     curr_timestep = update * nbatch
                     curr_reward_shaping = fn(curr_timestep)
                     env.update_reward_shaping_param(curr_reward_shaping)
-                    print("Current reward shaping", curr_reward_shaping)
+                    print("Reward shaping", curr_reward_shaping, "\tSeed", additional_params["CURR_SEED"])
 
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
 
