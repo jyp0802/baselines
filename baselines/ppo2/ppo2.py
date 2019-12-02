@@ -512,6 +512,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
 
 
 def make_tom_model(env, mlp, hm_number, agent_index):
+
     perseverance = env.tom_params[hm_number]["PERSEVERANCE_HM{}".format(hm_number)]
     teamwork = env.tom_params[hm_number]["TEAMWORK_HM{}".format(hm_number)]
     retain_goals = env.tom_params[hm_number]["RETAIN_GOALS_HM{}".format(hm_number)]

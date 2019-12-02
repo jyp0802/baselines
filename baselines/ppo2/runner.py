@@ -68,6 +68,7 @@ class Runner(AbstractEnvRunner):
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
             overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
             if overcooked:
+
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
 
                 import time
@@ -81,7 +82,7 @@ class Runner(AbstractEnvRunner):
                     #TODO: It's inefficient to calculate all actions, even though only 1 might be used?
                     if sum(sp_envs_bools) != num_envs:
 
-                        other_agent_actions_bc = other_agent_action()
+                        other_agent_actions_non_sp = other_agent_action()
 
                     # If there are environments selected to run in SP, generate self-play actions
                     if sum(sp_envs_bools) != 0:
@@ -95,7 +96,7 @@ class Runner(AbstractEnvRunner):
                             sp_action = other_agent_actions_sp[i]
                             other_agent_actions.append(sp_action)
                         else:
-                            bc_action = other_agent_actions_bc[i]
+                            bc_action = other_agent_actions_non_sp[i]
                             other_agent_actions.append(bc_action)
                 
                 else:
