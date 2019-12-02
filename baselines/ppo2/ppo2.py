@@ -5,6 +5,8 @@ import os.path as osp
 from collections import deque
 from baselines.common import explained_variance, set_global_seeds
 from baselines.common.policies import build_policy
+from overcooked_ai_py.agents.agent import AgentPair, ToMModel
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -39,7 +41,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
 
     nsteps: int                       number of steps of the vectorized environment per update (i.e. batch size is nsteps * nenv where
-                                      nenv is number of environment copies simulated in parallel)
+                                      nenv is number of environment copies simulated in parallel). pk note: in ppo.py nsteps is the "batch
+                                      size" whereas the "total batch size" is nsteps * nenv
 
     total_timesteps: int              number of timesteps (i.e. number of actions taken in the environment)
 
@@ -94,7 +97,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     policy = build_policy(env, network, **network_kwargs)
     
-    bestrew = 0
+    bestrew = -np.Inf
     # Get the nb of env
     nenvs = env.num_envs
 
@@ -117,6 +120,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     if load_path is not None:
         model.load(load_path)
+
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
     if eval_env is not None:
@@ -132,9 +136,12 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     best_rew_per_step = 0
 
     run_info = defaultdict(list)
-    nupdates = total_timesteps//nbatch
+    nupdates = total_timesteps // nbatch
     print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
+
+        print("UPDATE {} / {}".format(update, nupdates))
+
         assert nbatch % nminibatches == 0, "Have {} total batch size and want {} minibatches, can't split evenly".format(nbatch, nminibatches)
         # Start timer
         tstart = time.perf_counter()
@@ -254,6 +261,11 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
                 logger.dumpkvs()
 
+            # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and BCs
+            if additional_params["OTHER_AGENT_TYPE"] == "tom" \
+                    and update % additional_params["EVAL_FREQ"] == 0:
+                run_info = eval_and_viz_tom(additional_params, env, model, run_info)
+
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
                 from overcooked_ai_py.utils import save_dict_to_file
@@ -289,8 +301,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
 
-                # Save/overwrite best model if past a certain threshold
-                if ep_sparse_rew_mean > bestrew and ep_sparse_rew_mean > additional_params["SAVE_BEST_THRESH"]:
+                # Save/overwrite best model
+                if ep_sparse_rew_mean > bestrew:
                     # Don't save best model if still doing some self play and it's supposed to be a BC model
                     if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" and sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
@@ -337,7 +349,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         env.self_play_randomization = fn(curr_timestep)
                         print("Current self-play randomization", env.self_play_randomization)
 
-                
+
 
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
@@ -364,28 +376,34 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
             agent.set_mdp(overcooked_env.mdp)
 
-            if run_type == "ppo":
-                if additional_params["OTHER_AGENT_TYPE"] == 'sp':
-                    agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
+            if not additional_params["OTHER_AGENT_TYPE"] == 'tom':  # For TOM we vizualise
+                # and also evaluate the performance of the ppo with various agents in section "if update % log_interval"
+
+                if run_type == "ppo":
+                    if additional_params["OTHER_AGENT_TYPE"] == 'sp':
+                        agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
+
+                    else:
+                        print("PPO agent on index 0:")
+                        env.other_agent.set_mdp(overcooked_env.mdp)
+                        agent_pair = AgentPair(agent, env.other_agent)
+                        trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair,
+                                                                                        display=True, display_until=100)
+                        overcooked_env.reset()
+                        agent_pair.reset()
+                        print("Tot rew", tot_rewards, "Tot rew shaped", tot_shaped_rewards)
+
+                        print("PPO agent on index 1:")
+                        agent_pair = AgentPair(env.other_agent, agent)
+
                 else:
-                    print("PPO agent on index 0:")
-                    env.other_agent.set_mdp(overcooked_env.mdp)
-                    agent_pair = AgentPair(agent, env.other_agent)
-                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-                    overcooked_env.reset()
-                    agent_pair.reset()
-                    print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
-                    
-                    print("PPO agent on index 1:")
-                    agent_pair = AgentPair(env.other_agent, agent)
-                
-            else:
-                agent_pair = AgentPair(agent)
-            
-            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-            overcooked_env.reset()
-            agent_pair.reset()
-            print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
+                    agent_pair = AgentPair(agent)
+
+                trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
+                overcooked_env.reset()
+                agent_pair.reset()
+                print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
+
             print(additional_params["SAVE_DIR"])
 
     if nupdates > 0 and early_stopping:
@@ -397,5 +415,114 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)
 
+def eval_and_viz_tom(additional_params, env, model,run_info):
+    """
+    The ppo agent will play with a selection of other agents, to evaluate performance, including TOMs with
+    params 0 and 1 (who they'll also train with), and two different BC agents. They all play with both indices.
+    """
+
+    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+    from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+    from overcooked_ai_py.planning.planners import NO_COUNTERS_PARAMS, MediumLevelPlanner
+    from human_aware_rl.baselines_utils import get_agent_from_model
+
+    display_eval_games = additional_params["DISPLAY_EVAL_GAMES"]
+
+    mdp_params = additional_params["mdp_params"]
+    mdp_gen_params = additional_params["mdp_generation_params"]
+    mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
+    overcooked_env = OvercookedEnv(mdp=mdp_fn, **additional_params["env_params"])
+    mlp = MediumLevelPlanner.from_pickle_or_compute(overcooked_env.mdp, NO_COUNTERS_PARAMS, force_compute=True)
+
+    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
+    ppo_agent.set_mdp(overcooked_env.mdp)
+
+    if not additional_params["LOCAL_TESTING"]:  # Only evaluate with all 8 agents when not doing local testing
+
+        # Loop over both indices and 2 different TOM params
+        for ppo_index in range(2):
+            for tom_number in range(2):
+
+                tom_index = 1 - ppo_index
+                print('PPO index {} | Playing with TOM{}'.format(ppo_index, tom_number))
+                tom_agent = make_tom_model(env, mlp, tom_number, tom_index)
+
+                if ppo_index == 0:
+                    agent_pair = AgentPair(ppo_agent, tom_agent)
+                elif ppo_index == 1:
+                    agent_pair = AgentPair(tom_agent, ppo_agent)
+
+                trajs = overcooked_env.get_rollouts(agent_pair, num_games=additional_params["NUM_EVAL_GAMES"],
+                                                    final_state=False, display=False)  # reward shaping not needed
+                sparse_rews = trajs["ep_returns_sparse"]
+                avg_sparse_rew = np.mean(sparse_rews)
+
+                run_info["rew_ppo_idx{}_tom{}".format(ppo_index, tom_number)].append(avg_sparse_rew)
+
+                # To observe play:
+                if display_eval_games:
+                    overcooked_env.get_rollouts(agent_pair, num_games=1, final_state=False, display=True)
+
+            for bc_number in range(2):
+
+                bc_agent = env.bc_agent0 if bc_number == 0 else env.bc_agent1
+
+                if ppo_index == 0:
+                    agent_pair = AgentPair(ppo_agent, bc_agent)
+                elif ppo_index == 1:
+                    agent_pair = AgentPair(bc_agent, ppo_agent)
+
+                trajs = overcooked_env.get_rollouts(agent_pair, num_games=additional_params["NUM_EVAL_GAMES"],
+                                                    final_state=False, display=False)  # reward shaping not needed
+                sparse_rews = trajs["ep_returns_sparse"]
+                avg_sparse_rew = np.mean(sparse_rews)
+
+                run_info["rew_ppo_idx{}_bc{}".format(ppo_index, bc_number)].append(avg_sparse_rew)
+
+                # To observe play:
+                if display_eval_games:
+                    overcooked_env.get_rollouts(agent_pair, num_games=1, final_state=False, display=True)
+
+    elif additional_params["LOCAL_TESTING"]:
+
+        ppo_index = 0
+        tom_index = 1 - ppo_index
+        tom_number = 0
+
+        print('PPO index {} | Playing with TOM{}'.format(ppo_index, tom_number))
+        tom_agent = make_tom_model(env, mlp, tom_number, tom_index)
+
+        if ppo_index == 0:
+            agent_pair = AgentPair(ppo_agent, tom_agent)
+        elif ppo_index == 1:
+            agent_pair = AgentPair(tom_agent, ppo_agent)
+
+        trajs = overcooked_env.get_rollouts(agent_pair, num_games=additional_params["NUM_EVAL_GAMES"],
+                                            final_state=False, display=False)  # reward shaping not needed
+        sparse_rews = trajs["ep_returns_sparse"]
+        avg_sparse_rew = np.mean(sparse_rews)
+
+        run_info["rew_ppo_idx{}_tom{}".format(ppo_index, tom_number)].append(avg_sparse_rew)
+
+        # To observe play:
+        if display_eval_games:
+            overcooked_env.get_rollouts(agent_pair, num_games=1, final_state=False, display=True)
+
+    return run_info
 
 
+def make_tom_model(env, mlp, hm_number, agent_index):
+    perseverance = env.tom_params[hm_number]["PERSEVERANCE_HM{}".format(hm_number)]
+    teamwork = env.tom_params[hm_number]["TEAMWORK_HM{}".format(hm_number)]
+    retain_goals = env.tom_params[hm_number]["RETAIN_GOALS_HM{}".format(hm_number)]
+    wrong_decisions = env.tom_params[hm_number]["WRONG_DECISIONS_HM{}".format(hm_number)]
+    thinking_prob = env.tom_params[hm_number]["THINKING_PROB_HM{}".format(hm_number)]
+    path_teamwork = env.tom_params[hm_number]["PATH_TEAMWORK_HM{}".format(hm_number)]
+    rationality_coeff = env.tom_params[hm_number]["RATIONALITY_COEFF_HM{}".format(hm_number)]
+    prob_pausing = env.tom_params[hm_number]["PROB_PAUSING_HM{}".format(hm_number)]
+
+    return ToMModel(mlp=mlp, player_index=agent_index, perseverance=perseverance,
+                    teamwork=teamwork, retain_goals=retain_goals,
+                    wrong_decisions=wrong_decisions, thinking_prob=thinking_prob,
+                    path_teamwork=path_teamwork, rationality_coefficient=rationality_coeff,
+                    prob_pausing=prob_pausing)

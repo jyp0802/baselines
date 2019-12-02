@@ -34,6 +34,11 @@ class Runner(AbstractEnvRunner):
             sp_envs_bools = np.random.random(num_envs) < self.env.self_play_randomization
             print("SP envs: {}/{}".format(sum(sp_envs_bools), num_envs))
 
+        # For TOM agents, set the personality params for each parallel agent for this trajectory:
+        if self.env.other_agent_tom:
+            tom_params_choices = self.randomly_set_tom_params()
+            print('The TOM params in each env are: {}'.format(tom_params_choices))
+
         other_agent_simulation_time = 0
 
         from overcooked_ai_py.mdp.actions import Action
@@ -43,18 +48,7 @@ class Runner(AbstractEnvRunner):
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
 
-            # TODO: Not sure if this if statement is correct
-            elif self.env.other_agent_hm:
-
-                # Check the index for each agent matches with self.other_agent_idx. If not, then set the index. Best
-                # to do this here, because the indices are randomised [between episodes?], so putting this here
-                # ensures the indices are always correct.
-                #TODO: Better solution is to reset the HMs each time the env is reset, but this isn't straightforward
-                # (each HM could be reset whenever any index changes (signifying a reset), but this isn't so rigorous
-                for i in range(self.other_agent_idx.__len__()):
-                    if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
-                        self.env.other_agent[i].agent_index = self.other_agent_idx[i]
-                        self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
+            elif self.env.other_agent_tom:
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
@@ -84,7 +78,9 @@ class Runner(AbstractEnvRunner):
 
                     # If there are environments selected to not run in SP, generate actions
                     # for the other agent, otherwise we skip this step.
+                    #TODO: It's inefficient to calculate all actions, even though only 1 might be used?
                     if sum(sp_envs_bools) != num_envs:
+
                         other_agent_actions_bc = other_agent_action()
 
                     # If there are environments selected to run in SP, generate self-play actions
@@ -186,6 +182,32 @@ class Runner(AbstractEnvRunner):
         mb_returns = mb_advs + mb_values
         return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs)),
             mb_states, epinfos)
+
+    def randomly_set_tom_params(self):
+        """
+        Randomly choose which TOM params to use for each agent in the parallel envs
+        """
+        tom_params_choices = []
+        for i in range(self.env.num_envs):
+            tom_param_choice = np.random.randint(0, self.env.num_toms)
+            tpc = tom_param_choice
+            tom_params_choices.append(tom_param_choice)
+            self.env.other_agent[i].perseverance = self.env.tom_params[tpc]["PERSEVERANCE_HM{}".format(tpc)]
+            self.env.other_agent[i].teamwork = self.env.tom_params[tpc]["TEAMWORK_HM{}".format(tpc)]
+            self.env.other_agent[i].retain_goals = self.env.tom_params[tpc]["RETAIN_GOALS_HM{}".format(tpc)]
+            self.env.other_agent[i].wrong_decisions = self.env.tom_params[tpc]["WRONG_DECISIONS_HM{}".format(tpc)]
+            self.env.other_agent[i].thinking_prob = self.env.tom_params[tpc]["THINKING_PROB_HM{}".format(tpc)]
+            self.env.other_agent[i].path_teamwork = self.env.tom_params[tpc]["PATH_TEAMWORK_HM{}".format(tpc)]
+            self.env.other_agent[i].rationality_coefficient = self.env.tom_params[tpc][
+                "RATIONALITY_COEFF_HM{}".format(tpc)]
+            self.env.other_agent[i].prob_pausing = self.env.tom_params[tpc]["PROB_PAUSING_HM{}".format(tpc)]
+            # Set the index for the agent:
+            self.env.other_agent[i].agent_index = self.other_agent_idx[i]
+            self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
+            # Reset the "history" of the agent:
+            self.env.other_agent[i].reset_agent
+        return tom_params_choices
+
 # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 def sf01(arr):
     """
