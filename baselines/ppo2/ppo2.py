@@ -140,7 +140,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
 
-        print("UPDATE {} / {}".format(update, nupdates))
+        print("UPDATE {} / {}; (seed: {})".format(update, nupdates, additional_params["CURR_SEED"]))
 
         assert nbatch % nminibatches == 0, "Have {} total batch size and want {} minibatches, can't split evenly".format(nbatch, nminibatches)
         # Start timer
@@ -269,7 +269,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
                 from overcooked_ai_py.utils import save_dict_to_file
-                save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
+                save_dict_to_file(run_info, additional_params["CURRENT_SEED_DIR"] + "logs")
 
                 if additional_params["TRACK_TUNE"]:
                     from ray import tune
@@ -444,7 +444,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
             for tom_number in range(2):
 
                 tom_index = 1 - ppo_index
-                print('PPO index {} | Playing with TOM{}'.format(ppo_index, tom_number))
+                print('\nPPO index {} | Playing with TOM{}\n'.format(ppo_index, tom_number))
                 tom_agent = make_tom_model(env, mlp, tom_number, tom_index)
 
                 if ppo_index == 0:
@@ -464,6 +464,8 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
                     overcooked_env.get_rollouts(agent_pair, num_games=1, final_state=False, display=True)
 
             for bc_number in range(2):
+
+                print('\nPPO index {} | Playing with BC{}\n'.format(ppo_index, bc_number))
 
                 bc_agent = env.bc_agent0 if bc_number == 0 else env.bc_agent1
 
@@ -489,7 +491,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
         tom_index = 1 - ppo_index
         tom_number = 0
 
-        print('PPO index {} | Playing with TOM{}'.format(ppo_index, tom_number))
+        print('\nPPO index {} | Playing with TOM{}\n'.format(ppo_index, tom_number))
         tom_agent = make_tom_model(env, mlp, tom_number, tom_index)
 
         if ppo_index == 0:
