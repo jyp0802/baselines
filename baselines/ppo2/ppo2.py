@@ -470,7 +470,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
 
                 trajs = overcooked_env.get_rollouts(agent_pair, num_games=additional_params["NUM_EVAL_GAMES"],
                                                     final_state=False, display=False)  # reward shaping not needed
-                sparse_rews = trajs["ep_returns_sparse"]
+                sparse_rews = trajs["ep_returns"]
                 avg_sparse_rew = np.mean(sparse_rews)
 
                 run_info["rew_ppo_idx{}_tom{}".format(ppo_index, tom_number)].append(avg_sparse_rew)
@@ -492,7 +492,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
 
                 trajs = overcooked_env.get_rollouts(agent_pair, num_games=additional_params["NUM_EVAL_GAMES"],
                                                     final_state=False, display=False)  # reward shaping not needed
-                sparse_rews = trajs["ep_returns_sparse"]
+                sparse_rews = trajs["ep_returns"]
                 avg_sparse_rew = np.mean(sparse_rews)
 
                 run_info["rew_ppo_idx{}_bc{}".format(ppo_index, bc_number)].append(avg_sparse_rew)
@@ -517,7 +517,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
 
         trajs = overcooked_env.get_rollouts(agent_pair, num_games=additional_params["NUM_EVAL_GAMES"],
                                             final_state=False, display=False)  # reward shaping not needed
-        sparse_rews = trajs["ep_returns_sparse"]
+        sparse_rews = trajs["ep_returns"]
         avg_sparse_rew = np.mean(sparse_rews)
 
         run_info["rew_ppo_idx{}_tom{}".format(ppo_index, tom_number)].append(avg_sparse_rew)
