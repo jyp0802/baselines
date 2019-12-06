@@ -362,13 +362,13 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print('Saving to', savepath)
             model.save(savepath)
         
+        from overcooked_ai_py.agents.benchmarking import AgentEvaluator
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
             from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
             from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
             from overcooked_ai_py.agents.agent import AgentPair
-            from overcooked_ai_py.agents.benchmarking import AgentEvaluator
             from human_aware_rl.baselines_utils import get_agent_from_model
             from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
             print(additional_params["SAVE_DIR"])
