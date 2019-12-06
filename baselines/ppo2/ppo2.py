@@ -231,6 +231,10 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv('eprewmean', eprewmean)
             run_info['ep_perceived_rew_mean'].append(eprewmean)
 
+            # ood_penalty = safemean([epinfo['ood_penalty'] for epinfo in epinfobuf])
+            # logger.logkv('ood_penalty', ood_penalty)
+            # run_info['ood_penalty'].append(ood_penalty)
+
             ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
             run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
 
@@ -370,9 +374,10 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print(additional_params["SAVE_DIR"])
 
             mdp_params = additional_params["mdp_params"]
+            env_params = additional_params["env_params"]
             mdp_gen_params = additional_params["mdp_generation_params"]
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
-            overcooked_env = OvercookedEnv(mdp=mdp_fn, **additional_params["env_params"])
+            overcooked_env = OvercookedEnv(mdp=mdp_fn, **env_params)
             agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
             agent.set_mdp(overcooked_env.mdp)
 
@@ -405,6 +410,17 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
 
             print(additional_params["SAVE_DIR"])
+
+        # num_entropy_iter = nupdates // 10
+        # if update % num_entropy_iter == 0 or update == nupdates - 1:
+        #     mdp_params = additional_params["mdp_params"]
+        #     env_params = additional_params["env_params"]
+        #     ae = AgentEvaluator(mdp_params, env_params)
+        #     _ = ae.evaluate_agent_pair(agent_pair, num_games=100)
+        #     entropies = AgentEvaluator.trajectory_entropy(_)
+        #     run_info["policy_entropy"].append(entropies)
+        #     avg_rew_and_se = AgentEvaluator.trajectory_mean_and_se_rewards(_)
+        #     run_info["policy_reward"].append(avg_rew_and_se[0])
 
     if nupdates > 0 and early_stopping:
         checkdir = osp.join(logger.get_dir(), 'checkpoints')

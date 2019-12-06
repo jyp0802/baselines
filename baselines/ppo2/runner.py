@@ -46,7 +46,8 @@ class Runner(AbstractEnvRunner):
         def other_agent_action():
             if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
-                return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
+                actions, probs = zip(*other_agent_actions)
+                return [Action.ACTION_TO_INDEX[a] for a in actions]
 
             elif self.env.other_agent_tom:
 
