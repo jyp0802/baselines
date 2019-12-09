@@ -35,7 +35,7 @@ class Runner(AbstractEnvRunner):
             print("SP envs: {}/{}".format(sum(sp_envs_bools), num_envs))
 
         # For TOM agents, set the personality params for each parallel agent for this trajectory:
-        if self.env.other_agent_tom:
+        if self.env.other_agent_tom and self.env.run_type is "ppo":
             tom_params_choices = self.randomly_set_tom_params()
             print('The TOM params in each env are: {}'.format(tom_params_choices))
 
@@ -54,6 +54,12 @@ class Runner(AbstractEnvRunner):
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
                 for i in range(self.other_agent_idx.__len__()):
+
+                    # For pbt, this is the stage where we set the indices!:
+                    if self.env.run_type == "pbt" and self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                        self.env.other_agent[i].agent_index = self.other_agent_idx[i]
+                        self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
+
                     assert self.env.other_agent[i].agent_index == self.other_agent_idx[i]
                     other_agent_actions.append(self.env.other_agent[i].action(self.curr_state[i]))
 
