@@ -266,7 +266,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 logger.dumpkvs()
 
             # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and BCs
-            if additional_params["OTHER_AGENT_TYPE"] == "tom" \
+            if additional_params["OTHER_AGENT_TYPE"]  == "tom" \
                     and update % additional_params["EVAL_FREQ"] == 0:
                 run_info = eval_and_viz_tom(additional_params, env, model, run_info)
 
