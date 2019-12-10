@@ -450,8 +450,7 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
     overcooked_env = OvercookedEnv(mdp=mdp_fn, **additional_params["env_params"])
     mlp = MediumLevelPlanner.from_pickle_or_compute(overcooked_env.mdp, NO_COUNTERS_PARAMS, force_compute=True)
 
-    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"],
-                                     is_joint_action=False, return_action_probs=False)
+    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"],is_joint_action=False, return_action_probs=False)
     ppo_agent.set_mdp(overcooked_env.mdp)
 
     if not additional_params["LOCAL_TESTING"]:  # Only evaluate with all 8 agents when not doing local testing
