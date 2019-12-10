@@ -378,7 +378,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             mdp_gen_params = additional_params["mdp_generation_params"]
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
             overcooked_env = OvercookedEnv(mdp=mdp_fn, **env_params)
-            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
+            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"), return_action_probs=False)
             agent.set_mdp(overcooked_env.mdp)
 
             if not additional_params["OTHER_AGENT_TYPE"] == 'tom':  # For TOM we vizualise
@@ -450,7 +450,8 @@ def eval_and_viz_tom(additional_params, env, model,run_info):
     overcooked_env = OvercookedEnv(mdp=mdp_fn, **additional_params["env_params"])
     mlp = MediumLevelPlanner.from_pickle_or_compute(overcooked_env.mdp, NO_COUNTERS_PARAMS, force_compute=True)
 
-    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
+    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"],
+                                     is_joint_action=False, return_action_probs=False)
     ppo_agent.set_mdp(overcooked_env.mdp)
 
     if not additional_params["LOCAL_TESTING"]:  # Only evaluate with all 8 agents when not doing local testing
