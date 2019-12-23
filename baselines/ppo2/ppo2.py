@@ -117,6 +117,10 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     if load_path is not None:
         model.load(load_path)
+
+    env_name = 'unknown' if 'env_name' not in env.__dict__.keys() else env.env_name
+    model.env_name = env_name
+    
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
     if eval_env is not None:
@@ -347,46 +351,60 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             savepath = osp.join(checkdir, '%.5i'%update)
             print('Saving to', savepath)
             model.save(savepath)
-        
-        from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
-            from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-            from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
-            from overcooked_ai_py.agents.agent import AgentPair
+
             from human_aware_rl.baselines_utils import get_agent_from_model
-            from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+            
+            if env_name == "Overcooked-v0":
+                from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+                from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
+                from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+                from overcooked_ai_py.agents.agent import AgentPair
+
+                mdp_params = additional_params["mdp_params"]
+                env_params = additional_params["env_params"]
+                mdp_gen_params = additional_params["mdp_generation_params"]
+                mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
+                base_env = OvercookedEnv(mdp=mdp_fn, **env_params)
+            elif env_name == "Gathering-v0":
+                from gathering_ai_py.mdp.gathering_env import GatheringEnv
+                from gathering_ai_py.mdp.gathering_mdp import GatheringGridworld
+                from gathering_ai_py.agents.agent import AgentPair
+
+                mdp_params = additional_params["mdp_params"]
+                env_params = additional_params["env_params"]
+                mdp_fn = lambda: GatheringGridworld.from_layout_name(**mdp_params)
+                base_env = GatheringEnv(mdp=mdp_fn, **env_params)
+            else:
+                raise ValueError("Unrecognized Env")
+
             print(additional_params["SAVE_DIR"])
 
-            mdp_params = additional_params["mdp_params"]
-            env_params = additional_params["env_params"]
-            mdp_gen_params = additional_params["mdp_generation_params"]
-            mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
-            overcooked_env = OvercookedEnv(mdp=mdp_fn, **env_params)
             agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
-            agent.set_mdp(overcooked_env.mdp)
+            agent.set_mdp(base_env.mdp)
 
             if run_type == "ppo":
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
                     agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
                 else:
                     print("PPO agent on index 0:")
-                    env.other_agent.set_mdp(overcooked_env.mdp)
+                    env.other_agent.set_mdp(base_env.mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
-                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-                    overcooked_env.reset()
+                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=100)
+                    base_env.reset()
                     agent_pair.reset()
                     print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
                     
                     print("PPO agent on index 1:")
                     agent_pair = AgentPair(env.other_agent, agent)
-                
             else:
                 agent_pair = AgentPair(agent)
             
-            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-            overcooked_env.reset()
+            trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=100)
+            base_env.reset()
             agent_pair.reset()
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
             print(additional_params["SAVE_DIR"])

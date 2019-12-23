@@ -36,23 +36,28 @@ class Runner(AbstractEnvRunner):
 
         other_agent_simulation_time = 0
 
-        from overcooked_ai_py.mdp.actions import Action
-
         def other_agent_action():
             if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
-                actions, probs = zip(*other_agent_actions)
+                actions, _ = zip(*other_agent_actions)
                 return [Action.ACTION_TO_INDEX[a] for a in actions]
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
                 return other_agent_actions
-            
+
+        overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
+        gathering = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Gathering-v0"
+
+        if overcooked:
+            from overcooked_ai_py.mdp.actions import Action
+        elif gathering:
+            from gathering_ai_py.mdp.actions import Action
 
         for _ in range(self.nsteps):
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
-            overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
-            if overcooked:
+            
+            if overcooked or gathering:
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
 
                 import time
@@ -121,13 +126,13 @@ class Runner(AbstractEnvRunner):
 
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
-            if overcooked:
+            if overcooked or gathering:
                 obs, rewards, self.dones, infos = self.env.step(joint_action)
                 # print("REWS", rewards, np.mean(rewards))
                 both_obs = obs["both_agent_obs"]
                 self.obs0[:] = both_obs[:, 0, :, :]
                 self.obs1[:] = both_obs[:, 1, :, :]
-                self.curr_state = obs["overcooked_state"]
+                self.curr_state = obs["overcooked_state"] if overcooked else obs["gathering_state"]
                 self.other_agent_idx = obs["other_agent_env_idx"]
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
