@@ -51,10 +51,7 @@ class Runner(AbstractEnvRunner):
 
             if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
-                if self.env.other_agent.return_action_probs:
-                    actions, probs = zip(*other_agent_actions)
-                else:
-                    actions = other_agent_actions
+                actions, probs = zip(*other_agent_actions)
                 return [Action.ACTION_TO_INDEX[a] for a in actions]
 
             elif self.env.other_agent_tom:
@@ -69,14 +66,15 @@ class Runner(AbstractEnvRunner):
                         self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
 
                     assert self.env.other_agent[i].agent_index == self.other_agent_idx[i]
-                    other_agent_actions.append(self.env.other_agent[i].action(self.curr_state[i]))
+                    actions, _ = self.env.other_agent[i].action(self.curr_state[i])
+                    other_agent_actions.append(actions)
 
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
 
             else:
-                other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
-                return other_agent_actions
-            
+                actions, _ = self.env.other_agent.direct_policy(self.obs1)
+                return actions
+
 
         for _ in range(self.nsteps):
             # Given observations, get action value and neglopacs
