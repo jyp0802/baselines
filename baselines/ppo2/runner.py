@@ -36,7 +36,11 @@ class Runner(AbstractEnvRunner):
 
         # For TOM agents, set the personality params for each parallel agent for this trajectory:
         if self.env.other_agent_tom and self.env.run_type is "ppo":
-            tom_params_choices = self.randomly_set_tom_params()
+            tom_params_choices = []
+            for i in range(self.env.num_envs):
+                tom_params_choice = self.env.other_agent[i].randomly_set_tom_params(self.env.num_toms,
+                                                                    self.other_agent_idx[i], self.env.tom_params)
+                tom_params_choices.append(tom_params_choice)
             print('The TOM params in each env are: {}'.format(tom_params_choices))
 
         other_agent_simulation_time = 0
@@ -44,6 +48,7 @@ class Runner(AbstractEnvRunner):
         from overcooked_ai_py.mdp.actions import Action
 
         def other_agent_action():
+
             if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
                 if self.env.other_agent.return_action_probs:
@@ -56,7 +61,7 @@ class Runner(AbstractEnvRunner):
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
-                for i in range(self.other_agent_idx.__len__()):
+                for i in range(len(self.other_agent_idx)):
 
                     # For pbt, this is the stage where we set the indices!:
                     if self.env.run_type == "pbt" and self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
@@ -89,7 +94,7 @@ class Runner(AbstractEnvRunner):
 
                     # If there are environments selected to not run in SP, generate actions
                     # for the other agent, otherwise we skip this step.
-                    #TODO: It's inefficient to calculate all actions, even though only 1 might be used?
+                    #TODO: It's (slightly) inefficient to calculate all actions, even though only 1 might be used?
                     if sum(sp_envs_bools) != num_envs:
 
                         other_agent_actions_non_sp = other_agent_action()
@@ -194,31 +199,6 @@ class Runner(AbstractEnvRunner):
         mb_returns = mb_advs + mb_values
         return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs)),
             mb_states, epinfos)
-
-    def randomly_set_tom_params(self):
-        """
-        Randomly choose which TOM params to use for each agent in the parallel envs
-        """
-        tom_params_choices = []
-        for i in range(self.env.num_envs):
-            tom_param_choice = np.random.randint(0, self.env.num_toms)
-            tpc = tom_param_choice
-            tom_params_choices.append(tom_param_choice)
-            self.env.other_agent[i].perseverance = self.env.tom_params[tpc]["PERSEVERANCE_HM{}".format(tpc)]
-            self.env.other_agent[i].teamwork = self.env.tom_params[tpc]["TEAMWORK_HM{}".format(tpc)]
-            self.env.other_agent[i].retain_goals = self.env.tom_params[tpc]["RETAIN_GOALS_HM{}".format(tpc)]
-            self.env.other_agent[i].wrong_decisions = self.env.tom_params[tpc]["WRONG_DECISIONS_HM{}".format(tpc)]
-            self.env.other_agent[i].thinking_prob = self.env.tom_params[tpc]["THINKING_PROB_HM{}".format(tpc)]
-            self.env.other_agent[i].path_teamwork = self.env.tom_params[tpc]["PATH_TEAMWORK_HM{}".format(tpc)]
-            self.env.other_agent[i].rationality_coefficient = self.env.tom_params[tpc][
-                "RATIONALITY_COEFF_HM{}".format(tpc)]
-            self.env.other_agent[i].prob_pausing = self.env.tom_params[tpc]["PROB_PAUSING_HM{}".format(tpc)]
-            # Set the index for the agent:
-            self.env.other_agent[i].agent_index = self.other_agent_idx[i]
-            self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
-            # Reset the "history" of the agent:
-            self.env.other_agent[i].reset_agent
-        return tom_params_choices
 
 # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 def sf01(arr):
