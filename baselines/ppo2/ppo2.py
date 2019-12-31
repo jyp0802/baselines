@@ -5,7 +5,6 @@ import os.path as osp
 from collections import deque
 from baselines.common import explained_variance, set_global_seeds
 from baselines.common.policies import build_policy
-from human_ai_robustness.human_ai_robustness_utils import eval_and_viz_tom
 
 try:
     from mpi4py import MPI
@@ -268,12 +267,12 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and BCs
             if additional_params["OTHER_AGENT_TYPE"]  == "tom" \
                     and update % additional_params["EVAL_FREQ"] == 0:
-                run_info = eval_and_viz_tom(additional_params, env, model, run_info)
+                run_info = env.other_agent[0].eval_and_viz_tom(additional_params, env, model, run_info)
 
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
                 from overcooked_ai_py.utils import save_dict_to_file
-                save_dict_to_file(run_info, additional_params["CURRENT_SEED_DIR"] + "logs")
+                save_dict_to_file(run_info, additional_params["CURRENT_SEED_DIR"] + "temp_logs")
 
                 if additional_params["TRACK_TUNE"]:
                     from ray import tune
