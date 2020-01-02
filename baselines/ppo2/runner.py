@@ -34,25 +34,54 @@ class Runner(AbstractEnvRunner):
             sp_envs_bools = np.random.random(num_envs) < self.env.self_play_randomization
             print("SP envs: {}/{}".format(sum(sp_envs_bools), num_envs))
 
+        # For TOM agents, set the personality params for each parallel agent for this trajectory:
+        if self.env.other_agent_tom and self.env.run_type is "ppo":
+            tom_params_choices = []
+            for i in range(self.env.num_envs):
+                tom_params_choice = self.env.other_agent[i].randomly_set_tom_params(self.env.num_toms,
+                                                                    self.other_agent_idx[i], self.env.tom_params)
+                tom_params_choices.append(tom_params_choice)
+            print('The TOM params in each env are: {}'.format(tom_params_choices))
+
         other_agent_simulation_time = 0
 
         from overcooked_ai_py.mdp.actions import Action
 
         def other_agent_action():
+
             if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
                 actions, probs = zip(*other_agent_actions)
                 return [Action.ACTION_TO_INDEX[a] for a in actions]
+
+            elif self.env.other_agent_tom:
+
+                # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
+                other_agent_actions = []
+                for i in range(len(self.other_agent_idx)):
+
+                    # For pbt, this is the stage where we set the indices!:
+                    if self.env.run_type == "pbt" and self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                        self.env.other_agent[i].agent_index = self.other_agent_idx[i]
+                        self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
+
+                    assert self.env.other_agent[i].agent_index == self.other_agent_idx[i]
+                    actions, _ = self.env.other_agent[i].action(self.curr_state[i])
+                    other_agent_actions.append(actions)
+
+                return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
+
             else:
-                other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
-                return other_agent_actions
-            
+                actions, _ = self.env.other_agent.direct_policy(self.obs1)
+                return actions
+
 
         for _ in range(self.nsteps):
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
             overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
             if overcooked:
+
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
 
                 import time
@@ -63,8 +92,10 @@ class Runner(AbstractEnvRunner):
 
                     # If there are environments selected to not run in SP, generate actions
                     # for the other agent, otherwise we skip this step.
+                    #TODO: It's (slightly) inefficient to calculate all actions, even though only 1 might be used?
                     if sum(sp_envs_bools) != num_envs:
-                        other_agent_actions_bc = other_agent_action()
+
+                        other_agent_actions_non_sp = other_agent_action()
 
                     # If there are environments selected to run in SP, generate self-play actions
                     if sum(sp_envs_bools) != 0:
@@ -78,7 +109,7 @@ class Runner(AbstractEnvRunner):
                             sp_action = other_agent_actions_sp[i]
                             other_agent_actions.append(sp_action)
                         else:
-                            bc_action = other_agent_actions_bc[i]
+                            bc_action = other_agent_actions_non_sp[i]
                             other_agent_actions.append(bc_action)
                 
                 else:
@@ -166,6 +197,7 @@ class Runner(AbstractEnvRunner):
         mb_returns = mb_advs + mb_values
         return (*map(sf01, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs)),
             mb_states, epinfos)
+
 # obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 def sf01(arr):
     """

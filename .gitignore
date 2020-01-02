@@ -34,3 +34,5 @@ src
 .cache
 
 MUJOCO_LOG.TXT
+/baselines/ppo2/ppo2_pk.py
+/baselines/ppo2/runner_pk.py

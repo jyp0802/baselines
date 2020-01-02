@@ -5,6 +5,7 @@ import os.path as osp
 from collections import deque
 from baselines.common import explained_variance, set_global_seeds
 from baselines.common.policies import build_policy
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -39,7 +40,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
 
     nsteps: int                       number of steps of the vectorized environment per update (i.e. batch size is nsteps * nenv where
-                                      nenv is number of environment copies simulated in parallel)
+                                      nenv is number of environment copies simulated in parallel). Note: in ppo.py nsteps is the "batch
+                                      size" whereas the "total batch size" is nsteps * nenv
 
     total_timesteps: int              number of timesteps (i.e. number of actions taken in the environment)
 
@@ -117,6 +119,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     if load_path is not None:
         model.load(load_path)
+
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
     if eval_env is not None:
@@ -132,9 +135,12 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     best_rew_per_step = 0
 
     run_info = defaultdict(list)
-    nupdates = total_timesteps//nbatch
+    nupdates = total_timesteps // nbatch
     print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
+
+        print("UPDATE {} / {}; (seed: {})".format(update, nupdates, additional_params["CURR_SEED"]))
+
         assert nbatch % nminibatches == 0, "Have {} total batch size and want {} minibatches, can't split evenly".format(nbatch, nminibatches)
         # Start timer
         tstart = time.perf_counter()
@@ -258,10 +264,15 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
                 logger.dumpkvs()
 
+            # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and BCs
+            if additional_params["OTHER_AGENT_TYPE"]  == "tom" \
+                    and update % additional_params["EVAL_FREQ"] == 0:
+                run_info = env.other_agent[0].eval_and_viz_tom(additional_params, env, model, run_info)
+
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
                 from overcooked_ai_py.utils import save_dict_to_file
-                save_dict_to_file(run_info, additional_params["SAVE_DIR"] + "logs")
+                save_dict_to_file(run_info, additional_params["CURRENT_SEED_DIR"] + "temp_logs")
 
                 if additional_params["TRACK_TUNE"]:
                     from ray import tune
@@ -289,7 +300,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     curr_timestep = update * nbatch
                     curr_reward_shaping = fn(curr_timestep)
                     env.update_reward_shaping_param(curr_reward_shaping)
-                    print("Reward shaping", curr_reward_shaping, "\tSeed", additional_params["CURR_SEED"])
+                    print("Current reward shaping", curr_reward_shaping)
 
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
 
@@ -341,6 +352,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         env.self_play_randomization = fn(curr_timestep)
                         print("Current self-play randomization", env.self_play_randomization)
 
+
+
         if save_interval and (update % save_interval == 0 or update == 1) and logger.get_dir() and (MPI is None or MPI.COMM_WORLD.Get_rank() == 0):
             checkdir = osp.join(logger.get_dir(), 'checkpoints')
             os.makedirs(checkdir, exist_ok=True)
@@ -364,31 +377,38 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             mdp_gen_params = additional_params["mdp_generation_params"]
             mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
             overcooked_env = OvercookedEnv(mdp=mdp_fn, **env_params)
-            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
+            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type ==
+                                                                                "joint_ppo"))
             agent.set_mdp(overcooked_env.mdp)
 
-            if run_type == "ppo":
-                if additional_params["OTHER_AGENT_TYPE"] == 'sp':
-                    agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
+            if not additional_params["OTHER_AGENT_TYPE"] == 'tom':  # For TOM we vizualise
+                # and also evaluate the performance of the ppo with various agents in section "if update % log_interval"
+
+                if run_type == "ppo":
+                    if additional_params["OTHER_AGENT_TYPE"] == 'sp':
+                        agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
+
+                    else:
+                        print("PPO agent on index 0:")
+                        env.other_agent.set_mdp(overcooked_env.mdp)
+                        agent_pair = AgentPair(agent, env.other_agent)
+                        trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair,
+                                                                                        display=True, display_until=100)
+                        overcooked_env.reset()
+                        agent_pair.reset()
+                        print("Tot rew", tot_rewards)
+
+                        print("PPO agent on index 1:")
+                        agent_pair = AgentPair(env.other_agent, agent)
+
                 else:
-                    print("PPO agent on index 0:")
-                    env.other_agent.set_mdp(overcooked_env.mdp)
-                    agent_pair = AgentPair(agent, env.other_agent)
-                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-                    overcooked_env.reset()
-                    agent_pair.reset()
-                    print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
-                    
-                    print("PPO agent on index 1:")
-                    agent_pair = AgentPair(env.other_agent, agent)
-                
-            else:
-                agent_pair = AgentPair(agent)
-            
-            trajectory, time_taken, tot_rewards, tot_shaped_rewards = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-            overcooked_env.reset()
-            agent_pair.reset()
-            print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
+                    agent_pair = AgentPair(agent)
+
+                trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
+                overcooked_env.reset()
+                agent_pair.reset()
+                print("tot rew", tot_rewards)
+
             print(additional_params["SAVE_DIR"])
 
         # num_entropy_iter = nupdates // 10
@@ -410,5 +430,4 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
 def safemean(xs):
     return np.nan if len(xs) == 0 else np.mean(xs)
-
 
