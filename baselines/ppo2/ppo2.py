@@ -386,6 +386,11 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
             agent.set_mdp(base_env.mdp)
 
+            if additional_params["ENVIRONMENT_TYPE"] == "Gathering":
+                display_until = 400
+            else:
+                display_until = 100
+
             if run_type == "ppo":
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
                     agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
@@ -393,7 +398,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     print("PPO agent on index 0:")
                     env.other_agent.set_mdp(base_env.mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
-                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=100)
+                    trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=display_until)
                     base_env.reset()
                     agent_pair.reset()
                     print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
@@ -403,7 +408,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             else:
                 agent_pair = AgentPair(agent)
             
-            trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=100)
+            trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=display_until)
             base_env.reset()
             agent_pair.reset()
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
