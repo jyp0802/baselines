@@ -396,6 +396,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
                 else:
                     print("PPO agent on index 0:")
+                    env.other_agent.check_parallel = False
                     env.other_agent.set_mdp(base_env.mdp)
                     agent_pair = AgentPair(agent, env.other_agent)
                     trajectory, time_taken, tot_rewards, tot_shaped_rewards = base_env.run_agents(agent_pair, display=True, display_until=display_until)
@@ -413,6 +414,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             agent_pair.reset()
             print("tot rew", tot_rewards, "tot rew shaped", tot_shaped_rewards)
             print(additional_params["SAVE_DIR"])
+            env.other_agent.check_parallel = True
 
         # num_entropy_iter = nupdates // 10
         # if update % num_entropy_iter == 0 or update == nupdates - 1:
