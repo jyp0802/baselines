@@ -269,26 +269,30 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
                 if ep_sparse_rew_mean > bestrew:
                     # Don't save best model if still doing some self play and it's supposed to be a BC model
-                    if additional_params["OTHER_AGENT_TYPE"][
-                       :2] == "bc" and sp_horizon != 0 and env.self_play_randomization > 0:
+                    if additional_params["OTHER_AGENT_TYPE"][:2] == "bc" \
+                            and sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
                     # Similarly don't save best model if still doing self play and it's a TOM model
-                    elif additional_params[
-                        "OTHER_AGENT_TYPE"] == "tom" and sp_horizon != 0 and env.self_play_randomization > 0:
+                    elif additional_params["OTHER_AGENT_TYPE"] == "tom" \
+                            and sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
                     else:
                         from human_aware_rl.ppo.ppo import save_ppo_model
                         print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                         save_ppo_model(model, "{}seed{}/best".format(
                             additional_params["SAVE_DIR"],
-                            additional_params["CURR_SEED"])
-                                       )
+                            additional_params["CURR_SEED"]))
                         bestrew = max(ep_sparse_rew_mean, bestrew)
 
             # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and BCs
             if additional_params["OTHER_AGENT_TYPE"]  == "tom" \
                     and update % additional_params["EVAL_FREQ"] == 0:
-                run_info = env.other_agent[0].eval_and_viz_tom(additional_params, env, model, run_info)
+                if additional_params["EVAL_WITH_BEST_MODEL"]:
+                    from human_aware_rl.ppo.ppo_tom import get_ppo_agent
+                    ppo_agent, _ = get_ppo_agent(additional_params["SAVE_DIR"], additional_params["CURR_SEED"], best=True)
+                else:
+                    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
+                run_info = env.other_agent[0].eval_and_viz_tom(additional_params, env, ppo_agent, run_info)
 
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
