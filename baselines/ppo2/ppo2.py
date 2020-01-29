@@ -228,9 +228,19 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv('eprewmean', eprewmean)
             run_info['ep_perceived_rew_mean'].append(eprewmean)
 
-            # ood_penalty = safemean([epinfo['ood_penalty'] for epinfo in epinfobuf])
-            # logger.logkv('ood_penalty', ood_penalty)
-            # run_info['ood_penalty'].append(ood_penalty)
+            if additional_params["ENVIRONMENT_TYPE"] == "Gathering":
+                main_agent_indices_for_info_buffers = [epinfo['policy_agent_idx'] for epinfo in epinfobuf]
+                # print(main_agent_indices_for_info_buffers)
+                # print("GAME STATS", [epinfo['ep_game_stats'] for epinfo in epinfobuf])
+                for k in epinfobuf[0]['ep_game_stats'].keys():
+                    gamestat_mean = safemean([epinfo['ep_game_stats'][k][main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_main".format(k)].append(gamestat_mean)
+
+                    gamestat_mean_other = safemean([epinfo['ep_game_stats'][k][1 - main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_other".format(k)].append(gamestat_mean_other)
+
+                    logger.logkv("_{}_main".format(k), gamestat_mean)
+                    logger.logkv("_{}_other".format(k), gamestat_mean_other)
 
             ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
             run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
