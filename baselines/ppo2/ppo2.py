@@ -393,13 +393,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
             print(additional_params["SAVE_DIR"])
 
-            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"))
+            display_until = 100
+            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"), gathering=(additional_params["ENVIRONMENT_TYPE"] == "Gathering"))
             agent.set_mdp(base_env.mdp)
-
-            if additional_params["ENVIRONMENT_TYPE"] == "Gathering":
-                display_until = 400
-            else:
-                display_until = 100
 
             if run_type == "ppo":
                 if additional_params["OTHER_AGENT_TYPE"] == 'sp':
