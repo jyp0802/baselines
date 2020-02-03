@@ -21,6 +21,7 @@ class Runner(AbstractEnvRunner):
         # Here, we init the lists that will contain the mb of experiences
         mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_neglogpacs = [],[],[],[],[],[]
         mb_states = self.states
+        ep_ood_infos = []
         epinfos = []
         # For n in range number of steps
 
@@ -39,11 +40,12 @@ class Runner(AbstractEnvRunner):
         def other_agent_action():
             if self.env.use_action_method:
                 other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
-                actions, _ = zip(*other_agent_actions)
-                return [Action.ACTION_TO_INDEX[a] for a in actions]
+                actions, action_infos = zip(*other_agent_actions)
+                return [Action.ACTION_TO_INDEX[a] for a in actions], action_infos
             else:
                 other_agent_actions = self.env.other_agent.direct_policy(self.obs1)
-                return other_agent_actions
+                action_infos = {}
+                return other_agent_actions, action_infos
 
         overcooked = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Overcooked-v0"
         gathering = 'env_name' in self.env.__dict__.keys() and self.env.env_name == "Gathering-v0"
@@ -69,7 +71,7 @@ class Runner(AbstractEnvRunner):
                     # If there are environments selected to not run in SP, generate actions
                     # for the other agent, otherwise we skip this step.
                     if sum(sp_envs_bools) != num_envs:
-                        other_agent_actions_bc = other_agent_action()
+                        other_agent_actions_bc, other_agent_a_infos = other_agent_action()
 
                     # If there are environments selected to run in SP, generate self-play actions
                     if sum(sp_envs_bools) != 0:
@@ -91,7 +93,7 @@ class Runner(AbstractEnvRunner):
 
                     if self.env.self_play_randomization < 1:
                         # Get actions through the action method of the agent
-                        other_agent_actions = other_agent_action()
+                        other_agent_actions, other_agent_a_infos = other_agent_action()
 
                     # Naive non-parallelized way of getting actions for other
                     if self.env.self_play_randomization > 0:
@@ -119,6 +121,9 @@ class Runner(AbstractEnvRunner):
                 actions, values, self.states, neglogpacs = self.model.step(self.obs, S=self.states, M=self.dones)
                 mb_obs.append(self.obs.copy())
 
+            ood_bools = [int(inf["ood"]) if "ood" in inf.keys() else 0.5 for inf in other_agent_a_infos]
+            ep_ood_infos.append(ood_bools)
+
             mb_actions.append(actions)
             mb_values.append(values)
             mb_neglogpacs.append(neglogpacs)
@@ -134,8 +139,17 @@ class Runner(AbstractEnvRunner):
                 self.obs1[:] = both_obs[:, 1, :, :]
                 self.curr_state = obs["overcooked_state"] if overcooked else obs["gathering_state"]
                 self.other_agent_idx = obs["other_agent_env_idx"]
+                # infos["other_agent_ood"] = 
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
+
+            if infos[0].get('episode'):
+                # All environments should be synced for the ood counting to work
+                assert all(info.get('episode') for info in infos)
+                ood_infos_by_env = np.mean(ep_ood_infos, axis=0)
+                assert len(ood_infos_by_env) == num_envs
+                for env_idx, info in enumerate(infos):
+                    info["episode"]["OTHER_OOD"] = ood_infos_by_env[env_idx]
 
             for info in infos:
                 maybeepinfo = info.get('episode')

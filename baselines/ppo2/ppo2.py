@@ -228,8 +228,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             logger.logkv('eprewmean', eprewmean)
             run_info['ep_perceived_rew_mean'].append(eprewmean)
 
+            main_agent_indices_for_info_buffers = [epinfo['policy_agent_idx'] for epinfo in epinfobuf]
             if additional_params["ENVIRONMENT_TYPE"] == "Gathering":
-                main_agent_indices_for_info_buffers = [epinfo['policy_agent_idx'] for epinfo in epinfobuf]
                 # print(main_agent_indices_for_info_buffers)
                 # print("GAME STATS", [epinfo['ep_game_stats'] for epinfo in epinfobuf])
                 for k in epinfobuf[0]['ep_game_stats'].keys():
@@ -242,6 +242,13 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     logger.logkv("_{}_main".format(k), gamestat_mean)
                     logger.logkv("_{}_other".format(k), gamestat_mean_other)
 
+
+            # TODO:agent_infos
+            ood_proportion = safemean([epinfo['OTHER_OOD'] for epinfo in epinfobuf])
+            if ood_proportion != 0.5:
+                logger.logkv("_OOD_percentage_other", ood_proportion)
+                run_info['ood_other'].append(ood_proportion)
+            
             ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
             run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
 
