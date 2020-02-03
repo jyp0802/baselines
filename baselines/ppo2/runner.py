@@ -60,6 +60,8 @@ class Runner(AbstractEnvRunner):
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
             
             if overcooked or gathering:
+                other_agent_a_infos = [{} for _ in range(num_envs)]
+                
                 actions, values, self.states, neglogpacs = self.model.step(self.obs0, S=self.states, M=self.dones)
 
                 import time
