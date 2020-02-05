@@ -65,7 +65,11 @@ class Runner(AbstractEnvRunner):
                         self.env.other_agent[i].agent_index = self.other_agent_idx[i]
                         self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
 
-                    assert self.env.other_agent[i].agent_index == self.other_agent_idx[i]
+                    #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
+                    # might be switched. Adding this here is just a QUICK FIX, and should be fixed at the source (i.e. when the index changes)
+                    if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                        self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+
                     actions, _ = self.env.other_agent[i].action(self.curr_state[i])
                     other_agent_actions.append(actions)
 
@@ -160,6 +164,11 @@ class Runner(AbstractEnvRunner):
                 self.obs1[:] = both_obs[:, 1, :, :]
                 self.curr_state = obs["overcooked_state"]
                 self.other_agent_idx = obs["other_agent_env_idx"]
+
+                # TODO: Quick fix: if self.dones then we're at the end of an episode, so the agent's history might need to be reset
+                if self.dones[i]:
+                    self.env.other_agent[i].reset()
+
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
 
