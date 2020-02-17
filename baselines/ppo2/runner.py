@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 from baselines.common.runners import AbstractEnvRunner
 
 class Runner(AbstractEnvRunner):
@@ -45,7 +46,8 @@ class Runner(AbstractEnvRunner):
                 elif self.env.other_agent_type == "bc_pop":
                     # Randomly select a BC agent from the "store" to set as the i'th other_agent:
                     bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
-                    self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
+                    #TODO: Might be a better way of doing this, rather than making a deep copy?
+                    self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
                     self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
                     self.env.other_agent[i].reset()
                     other_agent_choices.append(bc_to_choose)
