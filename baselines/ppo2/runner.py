@@ -34,48 +34,52 @@ class Runner(AbstractEnvRunner):
             sp_envs_bools = np.random.random(num_envs) < self.env.self_play_randomization
             print("SP envs: {}/{}".format(sum(sp_envs_bools), num_envs))
 
-        # For TOM agents, set the personality params for each parallel agent for this trajectory:
-        if self.env.other_agent_tom and self.env.run_type is "ppo":
-            tom_params_choices = []
+        # For TOM/BC agents, set the personality params / choose the BC for each parallel agent for this trajectory
+        if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom"]:
+            other_agent_choices = []
             for i in range(self.env.num_envs):
-                tom_params_choice = self.env.other_agent[i].randomly_set_tom_params(self.env.num_toms,
-                                                                    self.other_agent_idx[i], self.env.tom_params)
-                tom_params_choices.append(tom_params_choice)
-            print('The TOM params in each env are: {}'.format(tom_params_choices))
+                if self.env.other_agent_type == "tom":
+                    tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
+                                                                               self.other_agent_idx[i], self.env.tom_params)
+                    other_agent_choices.append(tom_params_choice)
+                elif self.env.other_agent_type == "bc_pop":
+                    # Randomly select a BC agent from the "store" to set as the i'th other_agent:
+                    bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
+                    self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
+                    self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                    self.env.other_agent[i].reset()
+                    other_agent_choices.append(bc_to_choose)
+
+            print('The TOM/BC agents selected in each env are: {}'.format(other_agent_choices))
 
         other_agent_simulation_time = 0
 
         from overcooked_ai_py.mdp.actions import Action
 
-        def other_agent_action():
+        def get_other_agent_actions():
 
-            if self.env.use_action_method:
-                other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
-                actions, probs = zip(*other_agent_actions)
-                return [Action.ACTION_TO_INDEX[a] for a in actions]
+            # if self.env.use_action_method:
+            #     other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
+            #     actions, probs = zip(*other_agent_actions)
+            #     return [Action.ACTION_TO_INDEX[a] for a in actions]
 
-            elif self.env.other_agent_tom:
+            if self.env.other_agent_type in ["bc_pop", "tom"]:
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
                 for i in range(len(self.other_agent_idx)):
 
-                    # For pbt, this is the stage where we set the indices!:
-                    if self.env.run_type == "pbt" and self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
-                        self.env.other_agent[i].agent_index = self.other_agent_idx[i]
-                        self.env.other_agent[i].GHM.agent_index = 1 - self.other_agent_idx[i]
-
                     #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
-                    # might be switched. Adding this here is just a QUICK FIX, and should be fixed at the source (i.e. when the index changes)
+                    # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
                     if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
                         self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
-                    actions, _ = self.env.other_agent[i].action(self.curr_state[i])
-                    other_agent_actions.append(actions)
+                    action, _ = self.env.other_agent[i].action(self.curr_state[i])
+                    other_agent_actions.append(action)
 
                 return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
 
-            else:
+            else:   #TODO: This shouldn't be "else", because this won't work for all agent types
                 actions, _ = self.env.other_agent.direct_policy(self.obs1)
                 return actions
 
@@ -96,10 +100,9 @@ class Runner(AbstractEnvRunner):
 
                     # If there are environments selected to not run in SP, generate actions
                     # for the other agent, otherwise we skip this step.
-                    #TODO: It's (slightly) inefficient to calculate all actions, even though only 1 might be used?
+                    #TODO: It's (slightly) inefficient to calculate all actions, even though only 1 might be used
                     if sum(sp_envs_bools) != num_envs:
-
-                        other_agent_actions_non_sp = other_agent_action()
+                        other_agent_actions_non_sp = get_other_agent_actions()
 
                     # If there are environments selected to run in SP, generate self-play actions
                     if sum(sp_envs_bools) != 0:
@@ -110,18 +113,16 @@ class Runner(AbstractEnvRunner):
                     other_agent_actions = []
                     for i in range(num_envs):
                         if sp_envs_bools[i]:
-                            sp_action = other_agent_actions_sp[i]
-                            other_agent_actions.append(sp_action)
+                            other_agent_actions.append(other_agent_actions_sp[i])
                         else:
-                            bc_action = other_agent_actions_non_sp[i]
-                            other_agent_actions.append(bc_action)
+                            other_agent_actions.append(other_agent_actions_non_sp[i])
                 
                 else:
                     other_agent_actions = np.zeros_like(self.curr_state)
 
                     if self.env.self_play_randomization < 1:
                         # Get actions through the action method of the agent
-                        other_agent_actions = other_agent_action()
+                        other_agent_actions = get_other_agent_actions()
 
                     # Naive non-parallelized way of getting actions for other
                     if self.env.self_play_randomization > 0:
