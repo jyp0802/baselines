@@ -39,18 +39,24 @@ class Runner(AbstractEnvRunner):
         if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom"]:
             other_agent_choices = []
             for i in range(self.env.num_envs):
-                if self.env.other_agent_type == "tom":
-                    tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
-                                                                               self.other_agent_idx[i], self.env.tom_params)
-                    other_agent_choices.append(tom_params_choice)
-                elif self.env.other_agent_type == "bc_pop":
-                    # Randomly select a BC agent from the "store" to set as the i'th other_agent:
-                    bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
-                    #TODO: Might be a better way of doing this, rather than making a deep copy?
-                    self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
-                    self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
-                    self.env.other_agent[i].reset()
-                    other_agent_choices.append(bc_to_choose)
+                if sp_envs_bools[i]:
+                    other_agent_choices.append('SP')
+                else:
+                    if self.env.other_agent_type == "tom":
+                        tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
+                                                                            self.other_agent_idx[i], self.env.tom_params)
+                        other_agent_choices.append(tom_params_choice)
+                    elif self.env.other_agent_type == "bc_pop":
+                        # Randomly select a BC agent from the "store" to set as the i'th other_agent:
+                        bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
+                        # If we've already taken this BC from the store, then make a deepcopy:
+                        if bc_to_choose in other_agent_choices:
+                            self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
+                        else: # Otherwise it's fine to use the agent in the store directly:
+                            self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
+                        self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                        self.env.other_agent[i].reset()
+                        other_agent_choices.append(bc_to_choose)
 
             print('The TOM/BC agents selected in each env are: {}'.format(other_agent_choices))
 
@@ -58,28 +64,29 @@ class Runner(AbstractEnvRunner):
 
         from overcooked_ai_py.mdp.actions import Action
 
-        def get_other_agent_actions():
-
-            # if self.env.use_action_method:
-            #     other_agent_actions = self.env.other_agent.actions(self.curr_state, self.other_agent_idx)
-            #     actions, probs = zip(*other_agent_actions)
-            #     return [Action.ACTION_TO_INDEX[a] for a in actions]
+        def get_other_agent_actions(sp_envs_bools):
+            """Get actions for the other agent. If the agent is BC or TOM, then only get actions for envs that aren't being used for self-play"""
 
             if self.env.other_agent_type in ["bc_pop", "tom"]:
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
-                for i in range(len(self.other_agent_idx)):
+                for i in range(self.env.num_envs):
 
-                    #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
-                    # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
-                    if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
-                        self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                    # Only get actions for envs that aren't being used for self-play
+                    if sp_envs_bools[i]:
+                        other_agent_actions.append(None)
+                    else:
+                        #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
+                        # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
+                        if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
-                    action, _ = self.env.other_agent[i].action(self.curr_state[i])
-                    other_agent_actions.append(action)
+                        action, _ = self.env.other_agent[i].action(self.curr_state[i])
+                        action_index = Action.ACTION_TO_INDEX[action]
+                        other_agent_actions.append(action_index)
 
-                return [Action.ACTION_TO_INDEX[a] for a in other_agent_actions]
+                return other_agent_actions
 
             else:   #TODO: This shouldn't be "else", because this won't work for all agent types
                 actions, _ = self.env.other_agent.direct_policy(self.obs1)
@@ -102,9 +109,13 @@ class Runner(AbstractEnvRunner):
 
                     # If there are environments selected to not run in SP, generate actions
                     # for the other agent, otherwise we skip this step.
-                    #TODO: It's (slightly) inefficient to calculate all actions, even though only 1 might be used
                     if sum(sp_envs_bools) != num_envs:
-                        other_agent_actions_non_sp = get_other_agent_actions()
+                        other_agent_actions_non_sp = get_other_agent_actions(sp_envs_bools)
+
+                        # Safety check:
+                        for i in range(num_envs):
+                            if other_agent_actions_non_sp[i] == None:
+                                assert other_agent_choices[i] == "SP", "ERROR!"
 
                     # If there are environments selected to run in SP, generate self-play actions
                     if sum(sp_envs_bools) != 0:
@@ -118,6 +129,7 @@ class Runner(AbstractEnvRunner):
                             other_agent_actions.append(other_agent_actions_sp[i])
                         else:
                             other_agent_actions.append(other_agent_actions_non_sp[i])
+                            assert other_agent_actions_non_sp[i] != None, "Action should never be None"
                 
                 else:
                     other_agent_actions = np.zeros_like(self.curr_state)
@@ -169,8 +181,9 @@ class Runner(AbstractEnvRunner):
                 self.other_agent_idx = obs["other_agent_env_idx"]
 
                 # TODO: Quick fix: if self.dones then we're at the end of an episode, so the agent's history might need to be reset
-                if self.dones[i]:
-                    self.env.other_agent[i].reset()
+                for i in range(num_envs):
+                    if self.dones[i] and not sp_envs_bools[i]:
+                        self.env.other_agent[i].reset()
 
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
