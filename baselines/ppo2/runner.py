@@ -1,5 +1,6 @@
+
 import numpy as np
-import copy
+import copy, concurrent
 from baselines.common.runners import AbstractEnvRunner
 
 class Runner(AbstractEnvRunner):
@@ -64,6 +65,14 @@ class Runner(AbstractEnvRunner):
 
         from overcooked_ai_py.mdp.actions import Action
 
+        def find_action(agent_state_bool):
+            agent, state, sp_envs_bool = agent_state_bool
+            if sp_envs_bool:
+                return None, None
+            else:
+                _, probs = agent.action(state)
+            return probs
+
         def get_other_agent_actions(sp_envs_bools):
             """Get actions for the other agent. If the agent is BC or TOM, then only get actions for envs that aren't being used for self-play"""
 
@@ -71,20 +80,57 @@ class Runner(AbstractEnvRunner):
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
+
+                #TODO: From this whole next section, still need to keep the index setting, but remove all else?
+                agent_copy = []
+                actions0 = []
+                probss0 = []
                 for i in range(self.env.num_envs):
+
+                    agent_copy.append(copy.deepcopy(self.env.other_agent[i]))
 
                     # Only get actions for envs that aren't being used for self-play
                     if sp_envs_bools[i]:
-                        other_agent_actions.append(None)
+                        # other_agent_actions.append(None)
+                        action0, probs0 = None, None
                     else:
                         #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
                         # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
                         if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
                             self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
-                        action, _ = self.env.other_agent[i].action(self.curr_state[i])
+                        action0, probs0 = agent_copy[i].action(self.curr_state[i])
+                    actions0.append(action0)
+                    probss0.append(probs0)
+                #----------------------------------------------------------------------
+
+                # Use futures with threads = sim_threads
+                with concurrent.futures.ThreadPoolExecutor(max_workers=self.env.num_envs) as executor:
+                    results = list(executor.map(find_action,
+                                                [[self.env.other_agent[i], self.curr_state[i], sp_envs_bools[i]]
+                                                        for i in range(self.env.num_envs)]))
+
+                #TODO: This should be incorporated into find_action, so that find_action outputs other_agent_actions:
+                for i in range(self.env.num_envs):
+
+                    #TODO: DO THIS BIT PARALLEL!:
+                    probs = results[i]
+
+                    print(probss0[i])
+                    print(probs)
+                    # print('action: {}; action new: {}'.format(actions0[i], action))
+
+                    action = actions0[i]
+
+                    if not sp_envs_bools[i]:
+                        print('agent history: {}\nnewagent hist: {}'.format(
+                                                            agent_copy[i].history, self.env.other_agent[i].history))
                         action_index = Action.ACTION_TO_INDEX[action]
                         other_agent_actions.append(action_index)
+                    else:
+                        other_agent_actions.append(None)
+                    print('')
+
 
                 return other_agent_actions
 
