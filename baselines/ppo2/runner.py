@@ -1,6 +1,5 @@
-
 import numpy as np
-import copy, concurrent
+import copy
 from baselines.common.runners import AbstractEnvRunner
 
 class Runner(AbstractEnvRunner):
@@ -53,7 +52,7 @@ class Runner(AbstractEnvRunner):
                         # If we've already taken this BC from the store, then make a deepcopy:
                         if bc_to_choose in other_agent_choices:
                             self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
-                        else: # Otherwise it's fine to use the agent in the store directly:
+                        else: # Otherwise it's fine to use the agent in the store directly
                             self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
                         self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
                         self.env.other_agent[i].reset()
@@ -65,14 +64,6 @@ class Runner(AbstractEnvRunner):
 
         from overcooked_ai_py.mdp.actions import Action
 
-        def find_action(agent_state_bool):
-            agent, state, sp_envs_bool = agent_state_bool
-            if sp_envs_bool:
-                return None
-            else:
-                action, _ = agent.action(state)
-            return action
-
         def get_other_agent_actions(sp_envs_bools):
             """Get actions for the other agent. If the agent is BC or TOM, then only get actions for envs that aren't being used for self-play"""
 
@@ -80,28 +71,20 @@ class Runner(AbstractEnvRunner):
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 other_agent_actions = []
-
-                # Set the agent indices:
-                # TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
-                #  might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
                 for i in range(self.env.num_envs):
-                    if not sp_envs_bools[i] and (self.env.other_agent[i].agent_index != self.other_agent_idx[i]):
-                        self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
-                # Find agents' actions in parallel, with number of threads = sim_threads
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self.env.num_envs) as executor:
-                    actions = list(executor.map(find_action,
-                                                [[self.env.other_agent[i], self.curr_state[i], sp_envs_bools[i]]
-                                                        for i in range(self.env.num_envs)]))
+                    # Only get actions for envs that aren't being used for self-play
+                    if sp_envs_bools[i]:
+                        other_agent_actions.append(None)
+                    else:
+                        #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
+                        # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
+                        if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
-                #TODO: This should be incorporated into find_action, so that find_action outputs other_agent_actions:
-                for i in range(self.env.num_envs):
-                    action = actions[i]
-                    if not sp_envs_bools[i]:
+                        action, _ = self.env.other_agent[i].action(self.curr_state[i])
                         action_index = Action.ACTION_TO_INDEX[action]
                         other_agent_actions.append(action_index)
-                    else:
-                        other_agent_actions.append(None)
 
                 return other_agent_actions
 
