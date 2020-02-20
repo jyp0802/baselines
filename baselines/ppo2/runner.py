@@ -89,7 +89,7 @@ class Runner(AbstractEnvRunner):
                         self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
                 # Find agents' actions in parallel, with number of threads = sim_threads
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self.env.num_envs) as executor:
+                with concurrent.futures.ThreadPoolExecutor(10) as executor:
                     actions = list(executor.map(find_action,
                                                 [[self.env.other_agent[i], self.curr_state[i], sp_envs_bools[i]]
                                                         for i in range(self.env.num_envs)]))
