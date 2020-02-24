@@ -112,12 +112,14 @@ class Runner(AbstractEnvRunner):
                     if sum(sp_envs_bools) != num_envs:
                         other_agent_actions_non_sp = get_other_agent_actions(sp_envs_bools)
 
-                        # Safety check:
+                        # Check:
                         for i in range(num_envs):
                             if other_agent_actions_non_sp[i] == None:
                                 assert other_agent_choices[i] == "SP", "ERROR!"
 
                     # If there are environments selected to run in SP, generate self-play actions
+                    #TODO: This could be more efficient as we only need actions for the action SP parallel envs. E.g. select the SP envs from self.obs1, making a new obs of only these envs ("partial_obs"), then send
+                    # partial_obs into self.model.step, then finally put the resulting actions in their respective parallel envs
                     if sum(sp_envs_bools) != 0:
                         other_agent_actions_sp, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
 
@@ -180,7 +182,7 @@ class Runner(AbstractEnvRunner):
                 self.curr_state = obs["overcooked_state"]
                 self.other_agent_idx = obs["other_agent_env_idx"]
 
-                # TODO: Quick fix: if self.dones then we're at the end of an episode, so the agent's history might need to be reset
+                # TODO: Quick fix: if self.dones then we're at the end of an episode, so the agent's history might need to be reset:
                 for i in range(num_envs):
                     if self.dones[i] and not sp_envs_bools[i]:
                         self.env.other_agent[i].reset()
