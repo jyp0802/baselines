@@ -67,30 +67,40 @@ class Runner(AbstractEnvRunner):
         def get_other_agent_actions(sp_envs_bools):
             """Get actions for the other agent. If the agent is BC or TOM, then only get actions for envs that aren't being used for self-play"""
 
-            if self.env.other_agent_type in ["bc_pop", "tom"]:
+            #TODO: -0-0-0-0-0-0-0-0-0-0-0- TEMP VERSION FOR SPEED TEST!! -0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-
 
-                # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
-                other_agent_actions = []
-                for i in range(self.env.num_envs):
+            # We ASSUME that there is no SP here!
 
-                    # Only get actions for envs that aren't being used for self-play
-                    if sp_envs_bools[i]:
-                        other_agent_actions.append(None)
-                    else:
-                        #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
-                        # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
-                        if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
-                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+            # Get ALL actions, just using the first parallel agent!:
+            actions_and_probs = self.env.other_agent[0].actions(self.curr_state, self.other_agent_idx)
 
-                        action, _ = self.env.other_agent[i].action(self.curr_state[i])
-                        action_index = Action.ACTION_TO_INDEX[action]
-                        other_agent_actions.append(action_index)
+            # Convert:
+            other_agent_actions = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in range(self.env.num_envs)]
 
-                return other_agent_actions
+            # if self.env.other_agent_type in ["bc_pop", "tom"]:
+            #
+            #     # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
+            #     other_agent_actions = []
+            #     for i in range(self.env.num_envs):
+            #
+            #         # Only get actions for envs that aren't being used for self-play
+            #         if sp_envs_bools[i]:
+            #             other_agent_actions.append(None)
+            #         else:
+            #             #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
+            #             # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
+            #             if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+            #                 self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+            #
+            #             action, _ = self.env.other_agent[i].action(self.curr_state[i])
+            #             action_index = Action.ACTION_TO_INDEX[action]
+            #             other_agent_actions.append(action_index)
 
-            else:   #TODO: This shouldn't be "else", because this won't work for all agent types
-                actions, _ = self.env.other_agent.direct_policy(self.obs1)
-                return actions
+            return other_agent_actions
+
+            # else:   #TODO: This shouldn't be "else", because this won't work for all agent types
+            #     actions, _ = self.env.other_agent.direct_policy(self.obs1)
+            #     return actions
 
 
         for _ in range(self.nsteps):
