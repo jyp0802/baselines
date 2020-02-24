@@ -74,8 +74,6 @@ class Runner(AbstractEnvRunner):
             # Get ALL actions, just using the first parallel agent!:
             actions_and_probs = self.env.other_agent[0].actions(self.curr_state, self.other_agent_idx)
 
-            print('...')
-
             # Convert:
             other_agent_actions = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in range(self.env.num_envs)]
 
