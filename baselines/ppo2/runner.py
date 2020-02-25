@@ -47,16 +47,27 @@ class Runner(AbstractEnvRunner):
                                                                             self.other_agent_idx[i], self.env.tom_params)
                         other_agent_choices.append(tom_params_choice)
                     elif self.env.other_agent_type == "bc_pop":
-                        # Randomly select a BC agent from the "store" to set as the i'th other_agent:
-                        bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
-                        # If we've already taken this BC from the store, then make a deepcopy:
-                        if bc_to_choose in other_agent_choices:
-                            self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
-                        else: # Otherwise it's fine to use the agent in the store directly
-                            self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
-                        self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
-                        self.env.other_agent[i].reset()
-                        other_agent_choices.append(bc_to_choose)
+
+                        # TODO: Extend the below method of making BCs that share models but not histories to pop_size > 1
+                        if self.env.bc_pop_size > 1:
+                            # Randomly select a BC agent from the "store" to set as the i'th other_agent:
+                            bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
+                            # If we've already taken this BC from the store, then make a deepcopy:
+                            if bc_to_choose in other_agent_choices:
+                                self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
+                            else: # Otherwise it's fine to use the agent in the store directly
+                                self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
+                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                            self.env.other_agent[i].reset()
+                            other_agent_choices.append(bc_to_choose)
+                        else:
+                            other_agent_choices.append("BC0")
+
+            #TODO: Special case: bc with pop_size=1. This should be extended to pop_size>1 and incorporated into above
+            if self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size == 1:
+                self.env.other_agent[0] = self.env.bc_agent_store[0]
+                self.env.other_agent[0].reset
+                self.env.other_agent[0].parallel_indices = list(range(self.env.num_envs))
 
             print('The TOM/BC agents selected in each env are: {}'.format(other_agent_choices))
 
@@ -67,10 +78,34 @@ class Runner(AbstractEnvRunner):
         def get_other_agent_actions(sp_envs_bools):
             """Get actions for the other agent. If the agent is BC or TOM, then only get actions for envs that aren't being used for self-play"""
 
-            if self.env.other_agent_type in ["bc_pop", "tom"]:
+            other_agent_actions = []
+
+            # TODO: Special case: bc with pop_size=1. This should be extended to pop_size>1 and incorporated into below
+            if self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size == 1:
+
+                # Find only the states (& indices) for the envs with BCs in:
+                states_for_bc, player_idx_for_bc, parallel_idx_for_bc = [], [], []
+                for i in range(self.env.num_envs):
+                    if not sp_envs_bools[i]:
+                        states_for_bc.append(self.curr_state[i])
+                        player_idx_for_bc.append(self.other_agent_idx[i])
+                        parallel_idx_for_bc.append(self.env.other_agent[0].parallel_indices[i])
+
+                # Get all actions for the reduced list of states:
+                actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
+                action_indices = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in range(len(states_for_bc))]
+
+                for i in range(self.env.num_envs):
+                    if sp_envs_bools[i]:
+                        other_agent_actions.append(None)
+                    else:
+                        # Append others actions with the first action from the action_indices list
+                        other_agent_actions.append(action_indices.pop(0))
+                return other_agent_actions
+
+            elif self.env.other_agent_type in ["bc_pop", "tom"]:
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
-                other_agent_actions = []
                 for i in range(self.env.num_envs):
 
                     # Only get actions for envs that aren't being used for self-play
@@ -131,7 +166,7 @@ class Runner(AbstractEnvRunner):
                             other_agent_actions.append(other_agent_actions_sp[i])
                         else:
                             other_agent_actions.append(other_agent_actions_non_sp[i])
-                            assert other_agent_actions_non_sp[i] != None, "Action should never be None"
+                            assert other_agent_actions_non_sp[i] != None, "This action should never be None"
                 
                 else:
                     other_agent_actions = np.zeros_like(self.curr_state)
@@ -185,7 +220,10 @@ class Runner(AbstractEnvRunner):
                 # TODO: Quick fix: if self.dones then we're at the end of an episode, so the agent's history might need to be reset:
                 for i in range(num_envs):
                     if self.dones[i] and not sp_envs_bools[i]:
-                        self.env.other_agent[i].reset()
+                        if self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size == 1:
+                            self.env.other_agent[0].reset()
+                        else:
+                            self.env.other_agent[i].reset()
 
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
