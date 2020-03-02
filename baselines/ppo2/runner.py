@@ -35,6 +35,12 @@ class Runner(AbstractEnvRunner):
             sp_envs_bools = np.random.random(num_envs) < self.env.self_play_randomization
             print("SP envs: {}/{}".format(sum(sp_envs_bools), num_envs))
 
+        # Reduce the BC pop size for this iteration of runner (so that there are less calls to BCs during runner):
+        if self.env.other_agent_type == "bc_pop":
+            reduced_bc_pop_size = np.int(self.env.reduced_bc_pop_fraction*self.env.bc_pop_size)
+            bc_reduced_pop = np.sort(np.random.choice(np.arange(self.env.bc_pop_size), size=reduced_bc_pop_size,
+                                                      replace=False))
+
         # For TOM/BC agents, set the personality params / choose the BC for each parallel agent for this trajectory
         if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom"]:
             other_agent_choices = []
@@ -51,14 +57,14 @@ class Runner(AbstractEnvRunner):
                         #TODO: Link this together with the 1-bc code below
                         if self.env.bc_pop_size > 1:
 
-                            bc_choice = np.random.randint(0, self.env.bc_pop_size)
+                            bc_choice = np.random.choice(bc_reduced_pop)
                             if bc_choice not in other_agent_choices:
-
                                 self.env.other_agent[i] = self.env.bc_agent_store[bc_choice]
                                 self.env.other_agent[i].reset()
-                                self.env.other_agent[i].states_for_bc = []
-                                self.env.other_agent[i].player_idx_for_bc = []
-                                self.env.other_agent[i].parallel_idx_for_bc = []
+                                #TODO: Remove these (they are included below now)
+                                # self.env.other_agent[i].states_for_bc = []
+                                # self.env.other_agent[i].player_idx_for_bc = []
+                                # self.env.other_agent[i].parallel_idx_for_bc = []
                             else:
                                 pass
                             other_agent_choices.append(bc_choice)
@@ -130,20 +136,18 @@ class Runner(AbstractEnvRunner):
                         bc_choice = other_agent_choices[i]
                         if bc_choice not in bcs_to_call:
                             bcs_to_call.append(bc_choice)
-                            self.env.other_agent[i].states_for_bc.append(self.curr_state[i])
-                            self.env.other_agent[i].player_idx_for_bc.append(self.other_agent_idx[i])
-                            self.env.other_agent[i].parallel_idx_for_bc.append(i)
-
+                            self.env.other_agent[i].states_for_bc=[self.curr_state[i]]
+                            self.env.other_agent[i].player_idx_for_bc=[self.other_agent_idx[i]]
+                            self.env.other_agent[i].parallel_idx_for_bc=[i]
                         else:
                             # BC has already been allocated a parallel env:
                             bcs_to_call.append(None)
-                            bc_env_idx = bcs_to_call.index(bc_choice)
+                            bc_env_idx = other_agent_choices.index(bc_choice)  # This identifies the parallel env index for this agent
                             self.env.other_agent[bc_env_idx].states_for_bc.append(self.curr_state[i])
                             self.env.other_agent[bc_env_idx].player_idx_for_bc.append(self.other_agent_idx[i])
                             self.env.other_agent[bc_env_idx].parallel_idx_for_bc.append(i)
 
                 all_action_indices = []
-                bc_env_indices = []
                 # Now find the actions:
                 for i in range(len(bcs_to_call)):
                     if bcs_to_call[i] is not None:
@@ -152,7 +156,6 @@ class Runner(AbstractEnvRunner):
                                                                 self.env.other_agent[bc_env_idx].states_for_bc,
                                                                 self.env.other_agent[bc_env_idx].player_idx_for_bc,
                                                                 self.env.other_agent[bc_env_idx].parallel_idx_for_bc)
-
                         action_indices = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in
                                                         range(len(self.env.other_agent[bc_env_idx].states_for_bc))]
                         all_action_indices.append(action_indices)
