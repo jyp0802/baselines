@@ -44,7 +44,7 @@ class Runner(AbstractEnvRunner):
                 else:
                     if self.env.other_agent_type == "tom":
                         tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
-                                                                            self.other_agent_idx[i], self.env.tom_params)
+                                                                        self.other_agent_idx[i], self.env.tom_params)
                         other_agent_choices.append(tom_params_choice)
                     elif self.env.other_agent_type == "bc_pop":
 
