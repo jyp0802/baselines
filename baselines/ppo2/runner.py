@@ -35,11 +35,12 @@ class Runner(AbstractEnvRunner):
             sp_envs_bools = np.random.random(num_envs) < self.env.self_play_randomization
             print("SP envs: {}/{}".format(sum(sp_envs_bools), num_envs))
 
+        #TODO: Consider putting this back in: it creates a reduced pop so that each call to the bc is for more states
         # Reduce the BC pop size for this iteration of runner (so that there are less calls to BCs during runner):
-        if self.env.other_agent_type == "bc_pop":
-            reduced_bc_pop_size = np.int(self.env.reduced_bc_pop_fraction*self.env.bc_pop_size)
-            bc_reduced_pop = np.sort(np.random.choice(np.arange(self.env.bc_pop_size), size=reduced_bc_pop_size,
-                                                      replace=False))
+        # if self.env.other_agent_type == "bc_pop":
+        #     reduced_bc_pop_size = np.int(self.env.reduced_bc_pop_fraction*self.env.bc_pop_size)
+        #     bc_reduced_pop = np.sort(np.random.choice(np.arange(self.env.bc_pop_size), size=reduced_bc_pop_size,
+        #                                               replace=False))
 
         # For TOM/BC agents, set the personality params / choose the BC for each parallel agent for this trajectory
         if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom"]:
@@ -57,7 +58,10 @@ class Runner(AbstractEnvRunner):
                         #TODO: Link this together with the 1-bc code below
                         if self.env.bc_pop_size > 1:
 
-                            bc_choice = np.random.choice(bc_reduced_pop)
+                            # TODO: Consider putting this back in: it creates a reduced pop so that each call to the bc is for more states:
+                            # bc_choice = np.random.choice(bc_reduced_pop)
+
+                            bc_choice = np.random.randint(0, self.env.bc_pop_size)
                             if bc_choice not in other_agent_choices:
                                 self.env.other_agent[i] = self.env.bc_agent_store[bc_choice]
                                 self.env.other_agent[i].reset()
@@ -258,7 +262,7 @@ class Runner(AbstractEnvRunner):
                         else:
                             other_agent_actions.append(other_agent_actions_non_sp[i])
                             assert other_agent_actions_non_sp[i] != None, "This action should never be None"
-                
+
                 else:
                     other_agent_actions = np.zeros_like(self.curr_state)
 
@@ -329,7 +333,7 @@ class Runner(AbstractEnvRunner):
         print("Other agent actions took", other_agent_simulation_time, "seconds")
         tot_time = time.time() - tot_time
         print("Total simulation time for {} steps: {} \t Other agent action time: {} \t {} steps/s".format(self.nsteps, tot_time, int_time, self.nsteps / tot_time))
-        
+
         #batch of steps to batch of rollouts
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
