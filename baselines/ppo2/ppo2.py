@@ -387,33 +387,43 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                                                                                 "joint_ppo"))
             agent.set_mdp(overcooked_env.mdp)
 
-            if not additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"]:
-            # For TOM and bc_pop we vizualise and also evaluate the performance of the ppo with various agents in section "if update % log_interval"
+            if run_type == "ppo":
+                if additional_params["OTHER_AGENT_TYPE"] == 'sp':
+                    agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
 
-                if run_type == "ppo":
-                    if additional_params["OTHER_AGENT_TYPE"] == 'sp':
-                        agent_pair = AgentPair(agent, agent, allow_duplicate_agents=True)
+                elif additional_params["OTHER_AGENT_TYPE"] == "tom":
+                    print("PPO agent on index 0:")
+                    env.other_agent[0].set_mdp(overcooked_env.mdp)
+                    agent_pair = AgentPair(agent, env.other_agent[0])
+                    trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair,
+                                                                                       display=True, display_until=100)
+                    overcooked_env.reset()
+                    agent_pair.reset()
+                    print("Tot rew", tot_rewards)
 
-                    else:
-                        print("PPO agent on index 0:")
-                        env.other_agent.set_mdp(overcooked_env.mdp)
-                        agent_pair = AgentPair(agent, env.other_agent)
-                        trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair,
-                                                                                        display=True, display_until=100)
-                        overcooked_env.reset()
-                        agent_pair.reset()
-                        print("Tot rew", tot_rewards)
-
-                        print("PPO agent on index 1:")
-                        agent_pair = AgentPair(env.other_agent, agent)
+                    print("PPO agent on index 1:")
+                    agent_pair = AgentPair(env.other_agent[0], agent)
 
                 else:
-                    agent_pair = AgentPair(agent)
+                    print("PPO agent on index 0:")
+                    env.other_agent.set_mdp(overcooked_env.mdp)
+                    agent_pair = AgentPair(agent, env.other_agent)
+                    trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair,
+                                                                                    display=True, display_until=100)
+                    overcooked_env.reset()
+                    agent_pair.reset()
+                    print("Tot rew", tot_rewards)
 
-                trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-                overcooked_env.reset()
-                agent_pair.reset()
-                print("tot rew", tot_rewards)
+                    print("PPO agent on index 1:")
+                    agent_pair = AgentPair(env.other_agent, agent)
+
+            else:
+                agent_pair = AgentPair(agent)
+
+            trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
+            overcooked_env.reset()
+            agent_pair.reset()
+            print("tot rew", tot_rewards)
 
             print(additional_params["SAVE_DIR"])
 
