@@ -96,7 +96,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     policy = build_policy(env, network, **network_kwargs)
     
-    bestrew = -np.Inf
+    best_train_rew = -np.Inf
+    best_val_rew = -np.Inf
     # Get the nb of env
     nenvs = env.num_envs
 
@@ -265,31 +266,53 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 logger.dumpkvs()
 
             # Save/overwrite best model:
-            if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
+            if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"] and \
+                    "best_train" in additional_params["PPO_TO_SAVE"]:
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
-                if ep_sparse_rew_mean > bestrew:
+                if ep_sparse_rew_mean > best_train_rew:
                     # Don't save best model if still doing some self play and it's supposed to be a BC/TOM model
                     if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"] and \
                             sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
                     else:
                         from human_aware_rl.ppo.ppo import save_ppo_model
-                        print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
-                        save_ppo_model(model, "{}seed{}/best".format(
+                        print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", best_train_rew)
+                        save_ppo_model(model, "{}seed{}/best_train".format(
                             additional_params["SAVE_DIR"],
                             additional_params["CURR_SEED"]))
-                        bestrew = max(ep_sparse_rew_mean, bestrew)
+                        best_train_rew = max(ep_sparse_rew_mean, best_train_rew)
+
+            # Play trained agent with a validation population, then save/overwrite best validation model:
+            if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"] and \
+               "best_validation" in additional_params["PPO_TO_SAVE"] and \
+                update % additional_params["VAL_FREQ"] == 0 and \
+                additional_params["SELF_PLAY_HORIZON"] != 0 and env.self_play_randomization == 0:  # Don't save best model if still doing some self play
+
+                # Play validation:
+                from human_aware_rl.baselines_utils import get_agent_from_model
+                ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
+                from human_aware_rl.ppo.ppo_pop import play_validation_games
+                run_info, val_rew = play_validation_games(additional_params, ppo_agent, run_info, env)
+
+                # Overwrite if improvement:
+                if val_rew > best_val_rew:
+                    from human_aware_rl.ppo.ppo import save_ppo_model
+                    print("BEST VAL REW", val_rew, "overwriting previous model with", best_val_rew)
+                    save_ppo_model(model, "{}seed{}/best_val".format(
+                        additional_params["SAVE_DIR"],
+                        additional_params["CURR_SEED"]))
+                    best_val_rew = val_rew
 
             # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and/or BCs
-            if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"] and \
-                    update % additional_params["EVAL_FREQ"] == 0:
-                if additional_params["EVAL_WITH_BEST_MODEL"]:
-                    from human_aware_rl.ppo.ppo_pop import get_ppo_agent
-                    ppo_agent, _ = get_ppo_agent(additional_params["SAVE_DIR"], additional_params["CURR_SEED"], best=True)
-                else:
-                    ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
-                from human_aware_rl.ppo.ppo_pop import evaluate_model
-                run_info = evaluate_model(additional_params, ppo_agent, run_info)
+            # if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"] and \
+            #         update % additional_params["EVAL_FREQ"] == 0:
+            #     if additional_params["EVAL_WITH_BEST_MODEL"]:
+            #         from human_aware_rl.ppo.ppo_pop import get_ppo_agent
+            #         ppo_agent, _ = get_ppo_agent(additional_params["SAVE_DIR"], additional_params["CURR_SEED"], best=True)
+            #     else:
+            #         ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
+            #     from human_aware_rl.ppo.ppo_pop import evaluate_model
+            #     run_info = evaluate_model(additional_params, ppo_agent, run_info)
 
             # Update current logs
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"]:
@@ -366,7 +389,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             savepath = osp.join(checkdir, '%.5i'%update)
             print('Saving to', savepath)
             model.save(savepath)
-        
+
         from overcooked_ai_py.agents.benchmarking import AgentEvaluator
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
