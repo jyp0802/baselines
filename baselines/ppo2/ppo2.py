@@ -98,6 +98,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     
     best_train_rew = -np.Inf
     best_val_rew = -np.Inf
+    prev_val_rew = -np.Inf
     # Get the nb of env
     nenvs = env.num_envs
 
@@ -302,6 +303,15 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         additional_params["SAVE_DIR"],
                         additional_params["CURR_SEED"]))
                     best_val_rew = val_rew
+                else:
+                    # Early stopping:
+                    if prev_val_rew == best_val_rew:
+                        # In this case, the val score hasn't improved this update, but it did improve the previous update, so we will wait one more update before early stopping
+                        pass
+                    else:
+                        # Now the validation score didn't improve this iteration nor the previous one --> STOP PPO EARLY!
+                        break
+                prev_val_rew = val_rew
 
             # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and/or BCs
             # if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"] and \
