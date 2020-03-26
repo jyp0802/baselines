@@ -304,9 +304,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         additional_params["CURR_SEED"]))
                     best_val_rew = val_rew
                 else:
-                    # Early stopping:
+                    # Early stopping via validation score:
                     if prev_val_rew == best_val_rew:
-                        # In this case, the val score hasn't improved this update, but it did improve the previous update, so we will wait one more update before early stopping
+                        # In this case, the val score hasn't improved this update, but it did improve the previous val game, so we will wait one more val game before early stopping...
                         pass
                     else:
                         # Now the validation score didn't improve this iteration nor the previous one --> STOP PPO EARLY!
