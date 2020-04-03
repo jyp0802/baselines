@@ -98,7 +98,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     
     best_train_rew = -np.Inf
     best_val_rew = -np.Inf
-    prev_val_rew = -np.Inf
+    count_val_stagnation = 0
     # Get the nb of env
     nenvs = env.num_envs
 
@@ -262,7 +262,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 run_info[lossname].append(lossval)
                 
                 logger.logkv(lossname, lossval)
-
             if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
                 logger.dumpkvs()
 
@@ -292,26 +291,28 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 # Play validation:
                 from human_aware_rl.baselines_utils import get_agent_from_model
                 ppo_agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=False)
-                from human_aware_rl.ppo.ppo_pop import play_validation_games
-                run_info, val_rew = play_validation_games(additional_params, ppo_agent, run_info, env)
+                if additional_params["PARALLEL_VAL_GAMES"]:
+                    from human_aware_rl.ppo.ppo_pop import play_parallel_val_games
+                    run_info, val_rew = play_parallel_val_games(additional_params, ppo_agent, run_info, env)
+                else:
+                    from human_aware_rl.ppo.ppo_pop import play_validation_games
+                    run_info, val_rew = play_validation_games(additional_params, ppo_agent, run_info, env)
+                print('Update: {}; Mean val rews: {}; Best val rews: {}'.format(update, val_rew, best_val_rew))
 
                 # Overwrite if improvement:
                 if val_rew > best_val_rew:
                     from human_aware_rl.ppo.ppo import save_ppo_model
-                    print("BEST VAL REW", val_rew, "overwriting previous model with", best_val_rew)
+                    print("BEST VAL REW", val_rew, "overwriting previous model, which had", best_val_rew)
                     save_ppo_model(model, "{}seed{}/best_val".format(
                         additional_params["SAVE_DIR"],
                         additional_params["CURR_SEED"]))
                     best_val_rew = val_rew
+                    count_val_stagnation = 0  # Reset counter to zero
                 else:
-                    # Early stopping via validation score:
-                    if prev_val_rew == best_val_rew:
-                        # In this case, the val score hasn't improved this update, but it did improve the previous val game, so we will wait one more val game before early stopping...
-                        pass
-                    else:
-                        # Now the validation score didn't improve this iteration nor the previous one --> STOP PPO EARLY!
+                    count_val_stagnation += 1
+                    if count_val_stagnation >= additional_params["STOPPING_STAGNANT_UPDATES"]:
+                        # The validation score didn't improve for STOPPING_STAGNANT_UPDATES updates in a row: break from the ppo loop!
                         break
-                prev_val_rew = val_rew
 
             # For TOM, every EVAL_FREQ updates we evaluate the agent with TOMs and/or BCs
             # if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"] and \
