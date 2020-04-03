@@ -271,7 +271,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 sp_horizon = additional_params["SELF_PLAY_HORIZON"]
                 if ep_sparse_rew_mean > best_train_rew:
                     # Don't save best model if still doing some self play and it's supposed to be a BC/TOM model
-                    if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop"] and \
+                    if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop", "tom_bc"] and \
                             sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
                     else:

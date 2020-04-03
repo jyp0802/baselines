@@ -43,7 +43,7 @@ class Runner(AbstractEnvRunner):
         #                                               replace=False))
 
         # For TOM/BC agents, set the personality params / choose the BC for each parallel agent for this trajectory
-        if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom"]:
+        if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom", "tom_bc"]:
             other_agent_choices = []
             for i in range(self.env.num_envs):
                 if sp_envs_bools[i]:
@@ -74,6 +74,28 @@ class Runner(AbstractEnvRunner):
                             other_agent_choices.append(bc_choice)
                         else:
                             other_agent_choices.append("BC0")
+
+                    elif self.env.other_agent_type == "tom_bc":
+                        if np.random.rand() < 0.5:
+                            # Make a TOM agent:
+                            from human_aware_rl.ppo.ppo_pop import make_tom_agent
+                            self.env.other_agent[i] = make_tom_agent(self.env.mlp)
+                            tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
+                                                                                       self.other_agent_idx[i],
+                                                                                       self.env.tom_params)
+                            other_agent_choices.append(tom_params_choice)
+                        else:
+                            # Make a BC agent:
+                            bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
+                            # If we've already taken this BC from the store, then make a deepcopy:
+                            #TODO: Neglecting the fact that a TOM could be chosen with the same number! Wasted deepcopy sometimes:
+                            if bc_to_choose in other_agent_choices:
+                                self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
+                            else: # Otherwise it's fine to use the agent in the store directly
+                                self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
+                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                            self.env.other_agent[i].reset()
+                            other_agent_choices.append(bc_to_choose)
 
                         #TODO: OLD METHOD: DELETE!:
                         # if self.env.bc_pop_size > 1:
@@ -198,7 +220,7 @@ class Runner(AbstractEnvRunner):
                 return other_agent_actions
 
             #TODO: REMOVE BC FROM THIS:
-            elif self.env.other_agent_type in ["bc_pop", "tom"]:
+            elif self.env.other_agent_type in ["bc_pop", "tom", "tom_bc"]:
 
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 for i in range(self.env.num_envs):
