@@ -311,7 +311,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 # If val score doesn't improve by 10% after N timesteps, then early stop the code:
                 if val_rew > 1.1*signif_best_val_rew:
-                    signif_best_val_rew = best_val_rew
+                    signif_best_val_rew = val_rew
                     count_val_stagnation = 0  # Reset counter to zero
                     print('\nval_rew {} is 10% better than signif_best_val_rew ({}). Overwriting with the new signif_best_val_rew'.format(val_rew, signif_best_val_rew))
                 else:
