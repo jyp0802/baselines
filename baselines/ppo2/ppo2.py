@@ -298,7 +298,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 else:
                     from human_aware_rl.ppo.ppo_pop import play_validation_games
                     run_info, val_rew = play_validation_games(additional_params, ppo_agent, run_info, env)
-                print('\nUpdate: {}: Val rews: {}; Best val rews: {}'.format(update, val_rew, best_val_rew))
+                print('\nUpdate {}: Val rews: {}; Best val rews: {}'.format(update, val_rew, best_val_rew))
 
                 # Overwrite if improvement:
                 if val_rew > best_val_rew:
@@ -310,7 +310,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     best_val_rew = val_rew
 
                 # If val score doesn't improve by 10% after N timesteps, then early stop the code:
-                if val_rew > signif_best_val_rew:
+                if val_rew > 1.1*signif_best_val_rew:
                     signif_best_val_rew = best_val_rew
                     count_val_stagnation = 0  # Reset counter to zero
                     print('\nval_rew {} is 10% better than signif_best_val_rew ({}). Overwriting with the new signif_best_val_rew'.format(val_rew, signif_best_val_rew))
