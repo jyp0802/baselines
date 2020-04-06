@@ -98,6 +98,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     
     best_train_rew = -np.Inf
     best_val_rew = -np.Inf
+    signif_best_val_rew = -np.Inf  # This is only updated if the new val score is "significantly" better: we need a 10% improvement over the previous signif_best_val_rew
     count_val_stagnation = 0
     # Get the nb of env
     nenvs = env.num_envs
@@ -297,7 +298,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 else:
                     from human_aware_rl.ppo.ppo_pop import play_validation_games
                     run_info, val_rew = play_validation_games(additional_params, ppo_agent, run_info, env)
-                print('Update: {}; Mean val rews: {}; Best val rews: {}'.format(update, val_rew, best_val_rew))
+                print('\nUpdate: {}: Val rews: {}; Best val rews: {}'.format(update, val_rew, best_val_rew))
 
                 # Overwrite if improvement:
                 if val_rew > best_val_rew:
@@ -307,9 +308,17 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         additional_params["SAVE_DIR"],
                         additional_params["CURR_SEED"]))
                     best_val_rew = val_rew
+
+                # If val score doesn't improve by 10% after N timesteps, then early stop the code:
+                if val_rew > signif_best_val_rew:
+                    signif_best_val_rew = best_val_rew
                     count_val_stagnation = 0  # Reset counter to zero
+                    print('\nval_rew {} is 10% better than signif_best_val_rew ({}). Overwriting with the new signif_best_val_rew'.format(val_rew, signif_best_val_rew))
                 else:
                     count_val_stagnation += 1
+                    print('\nval_rew (currently {}) has not shown 10% improvement over signif_best_val_rew ({}) for {} '
+                            'timesteps. We exit loop after {} timesteps without 10% improvement.'.format(
+                            val_rew, signif_best_val_rew, count_val_stagnation, additional_params["STOPPING_STAGNANT_UPDATES"]))
                     if count_val_stagnation >= additional_params["STOPPING_STAGNANT_UPDATES"]:
                         # The validation score didn't improve for STOPPING_STAGNANT_UPDATES updates in a row: break from the ppo loop!
                         break
