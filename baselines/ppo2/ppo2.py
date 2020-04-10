@@ -100,6 +100,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     best_val_rew = -np.Inf
     signif_best_val_rew = -np.Inf  # This is only updated if the new val score is "significantly" better: we need a 10% improvement over the previous signif_best_val_rew
     count_val_stagnation = 0
+    count_train_stagnation = 0
     # Get the nb of env
     nenvs = env.num_envs
 
@@ -282,6 +283,17 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                             additional_params["SAVE_DIR"],
                             additional_params["CURR_SEED"]))
                         best_train_rew = max(ep_sparse_rew_mean, best_train_rew)
+                else:
+                    if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop", "tom_bc"] and \
+                            sp_horizon != 0 and env.self_play_randomization > 0:
+                        pass  # We don't want to consider early stopping until the self play has ended
+                    else:
+                        count_train_stagnation += 1
+                        print('\nTraining rew {} has not improved over the best_train_rew ({}) for {} updates. We early stop after {} updates'
+                              .format(ep_sparse_rew_mean, best_train_rew, count_train_stagnation, additional_params["STOPPING_TRAIN_STAGNANT_UPDATES"]))
+                        if count_train_stagnation >= additional_params["STOPPING_TRAIN_STAGNANT_UPDATES"]:
+                            # Here the training score hasn't increased for the specified timesteps, so we stop the ppo training
+                            break
 
             # Play trained agent with a validation population, then save/overwrite best validation model:
             if additional_params["RUN_TYPE"] in ["ppo", "joint_ppo"] and \
