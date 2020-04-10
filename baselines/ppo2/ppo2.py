@@ -327,7 +327,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     signif_best_val_rew = val_rew
                     count_val_stagnation = 0  # Reset counter to zero
                 else:
-                    count_val_stagnation += 1
+                    count_val_stagnation += additional_params["VAL_FREQ"]  # We only do val every VAL_FREQ updates
                     print('\nval_rew (currently {}) has not shown 10% improvement over signif_best_val_rew ({}) for {} '
                             'timesteps. We exit loop after {} timesteps without 10% improvement.'.format(
                             val_rew, signif_best_val_rew, count_val_stagnation, additional_params["STOPPING_STAGNANT_UPDATES"]))
