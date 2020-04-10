@@ -283,13 +283,14 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                             additional_params["SAVE_DIR"],
                             additional_params["CURR_SEED"]))
                         best_train_rew = max(ep_sparse_rew_mean, best_train_rew)
+                        count_train_stagnation = 0  # Reset
                 else:
                     if additional_params["OTHER_AGENT_TYPE"] in ["tom" , "bc_pop", "tom_bc"] and \
                             sp_horizon != 0 and env.self_play_randomization > 0:
                         pass  # We don't want to consider early stopping until the self play has ended
                     else:
                         count_train_stagnation += 1
-                        print('\nTraining rew {} has not improved over the best_train_rew ({}) for {} updates. We early stop after {} updates'
+                        print('\nTraining rew {} has not improved over the best_train_rew ({}) for {} update(s). We early stop after {} updates'
                               .format(ep_sparse_rew_mean, best_train_rew, count_train_stagnation, additional_params["STOPPING_TRAIN_STAGNANT_UPDATES"]))
                         if count_train_stagnation >= additional_params["STOPPING_TRAIN_STAGNANT_UPDATES"]:
                             # Here the training score hasn't increased for the specified timesteps, so we stop the ppo training
