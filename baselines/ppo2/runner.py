@@ -38,13 +38,14 @@ class Runner(AbstractEnvRunner):
         #TODO: Consider putting this back in: it creates a reduced pop so that each call to the bc is for more states
         # Reduce the BC pop size for this iteration of runner (so that there are less calls to BCs during runner):
         # if self.env.other_agent_type == "bc_pop":
-        #     reduced_bc_pop_size = np.int(self.env.reduced_bc_pop_fraction*self.env.bc_pop_size)
+        #     reduced_bc_pop_size = np.int(self.env.reduced_bc_pop_fraction*`self.env.bc_pop_s`ize)
         #     bc_reduced_pop = np.sort(np.random.choice(np.arange(self.env.bc_pop_size), size=reduced_bc_pop_size,
         #                                               replace=False))
 
         # For TOM/BC agents, set the personality params / choose the BC for each parallel agent for this trajectory
         if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom", "tom_bc"]:
             other_agent_choices = []
+            tom_this_env = [0]*self.env.num_envs
             for i in range(self.env.num_envs):
                 if sp_envs_bools[i]:
                     other_agent_choices.append('SP')
@@ -76,47 +77,38 @@ class Runner(AbstractEnvRunner):
                             other_agent_choices.append("BC0")
 
                     elif self.env.other_agent_type == "tom_bc":
-                        if np.random.rand() < 0.5:
+                        # We assume that we're splitting the agents into 1/2 bc and 1/2 TOM, so make the first 1/2 of
+                        # gym.envs as BCs, and the rest TOMs. If there is only one BC, then make it a parallel BC agent (above)
+                        if i < self.env.num_envs/2 and self.env.bc_pop_size == 1:
+                            other_agent_choices.append("BC0")
+                        elif i < self.env.num_envs/2 and self.env.bc_pop_size > 1:
+                            # For the first half of envs, make BCs (if there's more than one BC):
+                            bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
+                            # If we've already taken this BC from the store, then make a deepcopy:
+                            # TODO: Neglecting the fact that a TOM could be chosen with the same number! Wasted deepcopy sometimes:
+                            if bc_to_choose in other_agent_choices:
+                                self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
+                            else:  # Otherwise it's fine to use the agent in the store directly
+                                self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
+                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                            self.env.other_agent[i].reset()
+                            other_agent_choices.append(bc_to_choose)
+                        elif i >= self.env.num_envs/2:
                             # Make a TOM agent:
                             from human_aware_rl.ppo.ppo_pop import make_tom_agent
                             self.env.other_agent[i] = make_tom_agent(self.env.mlp)
                             tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
                                                                                        self.other_agent_idx[i],
                                                                                        self.env.tom_params)
+                            tom_this_env[i] = 1
                             other_agent_choices.append(tom_params_choice)
-                        else:
-                            # Make a BC agent:
-                            bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
-                            # If we've already taken this BC from the store, then make a deepcopy:
-                            #TODO: Neglecting the fact that a TOM could be chosen with the same number! Wasted deepcopy sometimes:
-                            if bc_to_choose in other_agent_choices:
-                                self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
-                            else: # Otherwise it's fine to use the agent in the store directly
-                                self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
-                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
-                            self.env.other_agent[i].reset()
-                            other_agent_choices.append(bc_to_choose)
-
-                        #TODO: OLD METHOD: DELETE!:
-                        # if self.env.bc_pop_size > 1:
-                        #     # Randomly select a BC agent from the "store" to set as the i'th other_agent:
-                        #     bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
-                        #     # If we've already taken this BC from the store, then make a deepcopy:
-                        #     if bc_to_choose in other_agent_choices:
-                        #         self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
-                        #     else: # Otherwise it's fine to use the agent in the store directly
-                        #         self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
-                        #     self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
-                        #     self.env.other_agent[i].reset()
-                        #     other_agent_choices.append(bc_to_choose)
-                        # else:
-                        #     other_agent_choices.append("BC0")
 
             #TODO: Special case: bc with pop_size=1. This should be extended to pop_size>1 and incorporated into above
-            if self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size == 1:
+            if self.env.other_agent_type in ["bc_pop", "tom_bc"] and self.env.bc_pop_size == 1:
                 self.env.other_agent[0] = self.env.bc_agent_store[0]
                 self.env.other_agent[0].reset
-                self.env.other_agent[0].parallel_indices = list(range(self.env.num_envs))
+                self.env.other_agent[0].parallel_indices = list(range(self.env.num_envs)) \
+                    if self.env.other_agent_type == "bc_pop" else list(range(self.env.num_envs // 2))  # If tom_bc then only the first half of envs will have the bc
 
             print('The TOM/BC agents selected in each env are: {}'.format(other_agent_choices))
 
@@ -130,26 +122,33 @@ class Runner(AbstractEnvRunner):
             other_agent_actions = []
 
             #TODO: Special case: bc with pop_size=1. This should be extended to pop_size>1 and incorporated into below
-            if self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size == 1:
+            if self.env.other_agent_type in ["bc_pop", "tom_bc"] and self.env.bc_pop_size == 1:
 
                 # Find only the states (& indices) for the envs with BCs in:
                 states_for_bc, player_idx_for_bc, parallel_idx_for_bc = [], [], []
                 for i in range(self.env.num_envs):
-                    if not sp_envs_bools[i]:
+                    if not (sp_envs_bools[i] or tom_this_env[i]):
                         states_for_bc.append(self.curr_state[i])
                         player_idx_for_bc.append(self.other_agent_idx[i])
                         parallel_idx_for_bc.append(self.env.other_agent[0].parallel_indices[i])
 
                 # Get all actions for the reduced list of states:
-                actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
-                action_indices = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in range(len(states_for_bc))]
+                bc_actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
+                bc_action_indices = [Action.ACTION_TO_INDEX[bc_actions_and_probs[i][0]] for i in range(len(states_for_bc))]
 
                 for i in range(self.env.num_envs):
                     if sp_envs_bools[i]:
                         other_agent_actions.append(None)
+                    elif tom_this_env[i]:
+                        # TOM actions:
+                        if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
+                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
+                        tom_action, _ = self.env.other_agent[i].action(self.curr_state[i])
+                        tom_action_index = Action.ACTION_TO_INDEX[tom_action]
+                        other_agent_actions.append(tom_action_index)
                     else:
                         # Append others actions with the first action from the action_indices list
-                        other_agent_actions.append(action_indices.pop(0))
+                        other_agent_actions.append(bc_action_indices.pop(0))
                 return other_agent_actions
 
             #TODO: MERGE WITH 1 BC ABOVE!
@@ -230,7 +229,7 @@ class Runner(AbstractEnvRunner):
                         other_agent_actions.append(None)
                     else:
                         #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
-                        # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes)
+                        # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes). (Also change this above for tom_bc pop)
                         if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
                             self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
 
