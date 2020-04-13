@@ -133,7 +133,7 @@ class Runner(AbstractEnvRunner):
                         parallel_idx_for_bc.append(self.env.other_agent[0].parallel_indices[i])
 
                 # Get all actions for the reduced list of states, but only if at least one env has a BC in:
-                if states_for_bc > 0:
+                if len(states_for_bc) > 0:
                     bc_actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
                     bc_action_indices = [Action.ACTION_TO_INDEX[bc_actions_and_probs[i][0]] for i in range(len(states_for_bc))]
 
