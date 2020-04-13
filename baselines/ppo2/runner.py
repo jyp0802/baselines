@@ -85,7 +85,7 @@ class Runner(AbstractEnvRunner):
                             # For the first half of envs, make BCs (if there's more than one BC):
                             bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
                             # If we've already taken this BC from the store, then make a deepcopy:
-                            # TODO: Neglecting the fact that a TOM could be chosen with the same number! Wasted deepcopy sometimes:
+
                             if bc_to_choose in other_agent_choices:
                                 self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
                             else:  # Otherwise it's fine to use the agent in the store directly
@@ -132,9 +132,10 @@ class Runner(AbstractEnvRunner):
                         player_idx_for_bc.append(self.other_agent_idx[i])
                         parallel_idx_for_bc.append(self.env.other_agent[0].parallel_indices[i])
 
-                # Get all actions for the reduced list of states:
-                bc_actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
-                bc_action_indices = [Action.ACTION_TO_INDEX[bc_actions_and_probs[i][0]] for i in range(len(states_for_bc))]
+                # Get all actions for the reduced list of states, but only if at least one env has a BC in:
+                if states_for_bc > 0:
+                    bc_actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
+                    bc_action_indices = [Action.ACTION_TO_INDEX[bc_actions_and_probs[i][0]] for i in range(len(states_for_bc))]
 
                 for i in range(self.env.num_envs):
                     if sp_envs_bools[i]:
