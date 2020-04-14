@@ -338,8 +338,9 @@ class Runner(AbstractEnvRunner):
                 for i in range(num_envs):
                     if self.dones[i] and not sp_envs_bools[i]:
                         #TODO: Merge 1-bc with >1-bc:
-                        if self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size == 1:
-                            self.env.other_agent[0].reset()
+                        if self.env.other_agent_type in ["bc_pop", "tom_bc"] and self.env.bc_pop_size == 1:
+                            if self.env.other_agent[0] is not None:  # For "tom_bc" this can be None
+                                self.env.other_agent[0].reset()  #TODO: Resetting more times (for each env?) than is needed (once!)!
                         else:  # When using BCs, some envs can have a None agent:
                             if self.env.other_agent[i] is not None:
                                 self.env.other_agent[i].reset()
