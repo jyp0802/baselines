@@ -138,22 +138,37 @@ def lstm(nlstm=128, layer_norm=False):
 @register("cnn_lstm")
 def cnn_lstm(nlstm=128, layer_norm=False, **conv_kwargs):
     def network_fn(X, nenv=1):
+        # Micah: NOTE that naming is not consistent: nbatch is not used in the same way
+        # as in the ppo.py file.
+        # nbatch = number of threads when doing a forward pass (e.g. in runner)
+        # nbatch = TOTAL_BATCH_SIZE / NMINIBATCHES = nbatch_train (using same naming as in ppo2.py)
+        # so basically it's all the timesteps of the minibatch.
         nbatch = X.shape[0]
+        
+        # M - I believe this might always just be the size of the minibatch?
         nsteps = nbatch // nenv
 
         h = nature_cnn(X, **conv_kwargs)
 
-        M = tf.placeholder(tf.float32, [nbatch]) #mask (done t-1)
-        S = tf.placeholder(tf.float32, [nenv, 2*nlstm]) #states
+        # M – the mask is just a set of zeros (or ones initially I think) for the states
+        # that had a "Done" at the previous timestep. This is useful because you don't want to
+        # backprop the gradients in inter-episodes, but only intra-episodes.
+        M = tf.placeholder(tf.float32, [nbatch]) # mask (done t-1)
+        S = tf.placeholder(tf.float32, [nenv, 2*nlstm]) # states
 
+        # M – h is the number of hidden units returned by the CNN network.
+        # Doing some transformation magic to prepare for lstm layer
         xs = batch_to_seq(h, nenv, nsteps)
         ms = batch_to_seq(M, nenv, nsteps)
+
+        # M – tensors are now of shape [nenv, steps_per_env, -1]
 
         if layer_norm:
             h5, snew = utils.lnlstm(xs, ms, S, scope='lnlstm', nh=nlstm)
         else:
             h5, snew = utils.lstm(xs, ms, S, scope='lstm', nh=nlstm)
 
+        # Shaping tensors back to [?, obs_shape] again
         h = seq_to_batch(h5)
         initial_state = np.zeros(S.shape.as_list(), dtype=float)
 

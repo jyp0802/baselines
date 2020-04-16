@@ -79,7 +79,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     additional_params = network_kwargs["network_kwargs"]
     from baselines import logger
 
-    # set_global_seeds(seed) We deal with seeds upstream
+    # set_global_seeds(seed) Micah: We deal with seeds upstream
 
     if "LR_ANNEALING" in additional_params.keys():
         lr_reduction_factor = additional_params["LR_ANNEALING"]
@@ -103,8 +103,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     ac_space = env.action_space
 
     # Calculate the batch_size
-    nbatch = nenvs * nsteps
-    nbatch_train = nbatch // nminibatches
+    nbatch = nenvs * nsteps # Micah: nbatch is the total batch size. Each env simulates nsteps
+    nbatch_train = nbatch // nminibatches # Micah: the minibactch size – the agreggated batch across simulation threads is then divided into nminibatches, and gradients are computed on each of these minibatches
 
     # Instantiate the model object (that creates act_model and train_model)
     if model_fn is None:
@@ -188,6 +188,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     mblossvals.append(model.train(lrnow, cliprangenow, *slices))
 
         else: # recurrent version
+            # Micah: My understanding is that the main difference lies in the randomization.
+            # We don't shuffle indices anymore within-episode, but only which envs' rollouts
+            # go in each minibatch
             assert nenvs % nminibatches == 0
             envsperbatch = nenvs // nminibatches
             envinds = np.arange(nenvs)

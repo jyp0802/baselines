@@ -30,6 +30,8 @@ class Model(object):
         self.sess = sess = get_session()
         self.scope = scope
 
+        self.policy = policy # Added by Micah 4.16.2020 – maybe we could use this to create action models with custom num of parallel states? maybe it requires the same variable scope though, as used below
+
         with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
             with tf.variable_scope('ppo2_model', reuse=tf.AUTO_REUSE):
                 # CREATE OUR TWO MODELS
@@ -134,6 +136,7 @@ class Model(object):
             sync_from_root(sess, global_variables) #pylint: disable=E1101
 
     def train(self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None):
+        # print("OBSS UPDATE", obs.shape)
         # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
         # Returns = R + yV(s')
         advs = returns - values
