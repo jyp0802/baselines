@@ -63,6 +63,26 @@ def fc(x, scope, nh, *, init_scale=1.0, init_bias=0.0):
         return tf.matmul(x, w)+b
 
 def batch_to_seq(h, nbatch, nsteps, flat=False):
+    """
+    Micah:
+
+    Note that the NN at forward pass takes in [num_parallel_envs, obs_shape].
+    At backprop time, the NN takes in [nbatch_train, obs_shape] (where nbatch_train is defined in ppo2.py)
+
+    These different input observation (that are possibly unrelated) are processed in parallel in the network.
+    Say they go through a CNN, leading to a large hidden layer [?, obs_shape] -> [?, hidden_layer_shape].
+
+    Note that at least as called by the lstm function:
+    - nbatch = num parallel envs
+    - nsteps = steps that each env took
+    This function performs the following transformation: [?, hidden_layer_shape] -> [nenv, steps_per_env, -1]
+
+    It makes sense to me how this would work in backwards pass, but not in forward pass? In forward pass, the observations
+    are much smaller –> it works because in forward pass one uses the action model (which has steps_per_env=1) rather than the train_model
+
+    Basically, what this function does is shaping the hidden layer input to the LSTM in such a way as to be able
+    to appropriately do LSTM for each input independently (not mixing up the histories for different states, say).
+    """
     if flat:
         h = tf.reshape(h, [nbatch, nsteps])
     else:
