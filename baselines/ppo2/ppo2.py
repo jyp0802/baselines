@@ -145,10 +145,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
         print("UPDATE {} / {}; (seed: {})".format(update, nupdates, additional_params["CURR_SEED"]))
 
-        print(
-            '\n##########################################################\nALLOW GPU GROWTH: {}\n##########################################################'.format(
-                model.sess._config.gpu_options.allow_growth))
-
         assert nbatch % nminibatches == 0, "Have {} total batch size and want {} minibatches, can't split evenly".format(nbatch, nminibatches)
         # Start timer
         tstart = time.perf_counter()
