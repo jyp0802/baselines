@@ -228,7 +228,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             run_info['explained_variance'].append(float(ev))
             
             eprewmean = safemean([epinfo['r'] for epinfo in epinfobuf])
-            logger.logkv('eprewmean', eprewmean)
+            logger.logkv('ep_perceived_rew_mean', eprewmean)
             run_info['ep_perceived_rew_mean'].append(eprewmean)
 
             main_agent_indices_for_info_buffers = [epinfo['policy_agent_idx'] for epinfo in epinfobuf]
@@ -244,6 +244,30 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                     logger.logkv("_{}_main".format(k), gamestat_mean)
                     logger.logkv("_{}_other".format(k), gamestat_mean_other)
+
+            if additional_params["ENVIRONMENT_TYPE"] == "Overcooked":
+                # Look at episode infos, find the game stats, keep track of them, and log them
+                from overcooked_ai_py.mdp.overcooked_mdp import EVENT_TYPES
+                for k in EVENT_TYPES:
+                    gamestat_mean = safemean([len(epinfo['ep_game_stats'][k][main_idx]) for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_main".format(k)].append(gamestat_mean)
+
+                    gamestat_mean_other = safemean([len(epinfo['ep_game_stats'][k][1 - main_idx]) for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_other".format(k)].append(gamestat_mean_other)
+
+                    logger.logkv("_{}_main".format(k), gamestat_mean)
+                    logger.logkv("_{}_other".format(k), gamestat_mean_other)
+
+                # Look at episode infos and look at task contribution by agent
+                for rew_type in ["sparse", "shaped"]:
+                    k = 'ep_{}_r_by_agent'.format(rew_type)
+                    gamestat_mean = safemean([epinfo[k][main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_r_main_contrib".format(rew_type)].append(gamestat_mean)
+                    gamestat_mean_other = safemean([epinfo[k][1 - main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_r_other_contrib".format(rew_type)].append(gamestat_mean_other)
+
+                    logger.logkv("_{}_r_main_contrib".format(rew_type), gamestat_mean)
+                    logger.logkv("_{}_r_other_contrib".format(rew_type), gamestat_mean_other)
 
 
             # TODO:agent_infos
