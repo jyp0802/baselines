@@ -344,6 +344,10 @@ class Runner(AbstractEnvRunner):
                         else:  # When using BCs, some envs can have a None agent:
                             if self.env.other_agent[i] is not None:
                                 self.env.other_agent[i].reset()
+                #TODO: CHECK IF THIS IS NEEDED!
+                # Resetting the internal lstm state at the end of the epsiode:
+                if True in self.dones:
+                    self.states = self.model.initial_state
 
             else:
                 self.obs[:], rewards, self.dones, infos = self.env.step(actions)
