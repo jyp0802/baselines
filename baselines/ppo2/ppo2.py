@@ -261,16 +261,17 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 # Look at episode infos and look at task contribution by agent
                 for rew_type in ["sparse", "shaped"]:
                     k = 'ep_{}_r_by_agent'.format(rew_type)
+
                     gamestat_mean = safemean([epinfo[k][main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
                     run_info["{}_r_main_contrib".format(rew_type)].append(gamestat_mean)
                     gamestat_mean_other = safemean([epinfo[k][1 - main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
                     run_info["{}_r_other_contrib".format(rew_type)].append(gamestat_mean_other)
 
-                    logger.logkv("_{}_r_main_contrib".format(rew_type), gamestat_mean)
-                    logger.logkv("_{}_r_other_contrib".format(rew_type), gamestat_mean_other)
+                    logger.logkv("_{}_r_contrib_main".format(rew_type), gamestat_mean)
+                    logger.logkv("_{}_r_contrib_other".format(rew_type), gamestat_mean_other)
 
 
-            # TODO:agent_infos
+            # TODO: agent_infos (4/23/2020 ?)
             ood_proportion = safemean([epinfo['OTHER_OOD'] for epinfo in epinfobuf])
             if ood_proportion != 0.5:
                 logger.logkv("_OOD_percentage_other", ood_proportion)
