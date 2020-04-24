@@ -280,11 +280,12 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                             sp_horizon != 0 and env.self_play_randomization > 0:
                         pass
                     else:
-                        from human_aware_rl.ppo.ppo import save_ppo_model
+                        from human_aware_rl.ppo.ppo_pop import save_ppo_model
                         print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", best_train_rew)
                         save_ppo_model(model, "{}seed{}/best_train".format(
                             additional_params["SAVE_DIR"],
-                            additional_params["CURR_SEED"]))
+                            additional_params["CURR_SEED"]),
+                                       additional_params)
                         best_train_rew = max(ep_sparse_rew_mean, best_train_rew)
                         count_train_stagnation = 0  # Reset
                 else:
@@ -318,11 +319,12 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                 # Overwrite if improvement:
                 if val_rew > best_val_rew:
-                    from human_aware_rl.ppo.ppo import save_ppo_model
+                    from human_aware_rl.ppo.ppo_pop import save_ppo_model
                     print("BEST VAL REW", val_rew, "overwriting previous model, which had", best_val_rew)
                     save_ppo_model(model, "{}seed{}/best_val".format(
                         additional_params["SAVE_DIR"],
-                        additional_params["CURR_SEED"]))
+                        additional_params["CURR_SEED"]),
+                                   additional_params)
                     best_val_rew = val_rew
 
                 # If val score doesn't improve by 10% after N timesteps, then early stop the code:
