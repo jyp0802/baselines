@@ -453,11 +453,11 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                     else:
                         print("PPO agent on index 0:")
-                        env.other_agent.set_mdp(overcooked_env.mdp)
+                        env.other_agent.set_mdp(base_env.mdp)
                         agent_pair = AgentPair(agent, env.other_agent)
-                        trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair,
+                        trajectory, time_taken, tot_rewards, _ = base_env.run_agents(agent_pair,
                                                                                         display=True, display_until=100)
-                        overcooked_env.reset()
+                        base_env.reset()
                         agent_pair.reset()
                         print("Tot rew", tot_rewards)
 
@@ -467,8 +467,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 else:
                     agent_pair = AgentPair(agent)
 
-                trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-                overcooked_env.reset()
+                trajectory, time_taken, tot_rewards, _ = base_env.run_agents(agent_pair, display=True, display_until=100)
+                base_env.reset()
                 agent_pair.reset()
                 print("tot rew", tot_rewards)
 
