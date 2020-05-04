@@ -24,6 +24,7 @@ class AbstractEnvRunner(ABC):
             self.obs[:] = env.reset()
         self.nsteps = nsteps
         self.states = model.initial_state
+        self.states1 = model.initial_state  # The lstm state for the "other" player -- i.e. the other ppo during SP
         self.dones = [False for _ in range(nenv)]
 
     @abstractmethod

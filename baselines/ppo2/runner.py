@@ -273,7 +273,7 @@ class Runner(AbstractEnvRunner):
                     #TODO: This could be more efficient as we only need actions for the action SP parallel envs. E.g. select the SP envs from self.obs1, making a new obs of only these envs ("partial_obs"), then send
                     # partial_obs into self.model.step, then finally put the resulting actions in their respective parallel envs
                     if sum(sp_envs_bools) != 0:
-                        other_agent_actions_sp, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
+                        other_agent_actions_sp, _, self.states1, _ = self.model.step(self.obs1, S=self.states1, M=self.dones)
 
                     # Select other agent actions for each environment depending on whether it was selected
                     # for self play or not
@@ -294,7 +294,7 @@ class Runner(AbstractEnvRunner):
 
                     # Naive non-parallelized way of getting actions for other
                     if self.env.self_play_randomization > 0:
-                        self_play_actions, _, _, _ = self.model.step(self.obs1, S=self.states, M=self.dones)
+                        self_play_actions, _, self.states1, _ = self.model.step(self.obs1, S=self.states1, M=self.dones)
                         self_play_bools = np.random.random(num_envs) < self.env.self_play_randomization
 
                         for i in range(num_envs):
