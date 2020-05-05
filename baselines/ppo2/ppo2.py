@@ -362,7 +362,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                         save_ppo_model(model, "{}seed{}/best".format(
                             additional_params["SAVE_DIR"],
-                            additional_params["CURR_SEED"])
+                            additional_params["CURR_SEED"]), 
+                            additional_params
                         )
                         bestrew = max(ep_sparse_rew_mean, bestrew)
 
@@ -425,7 +426,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 env_params = additional_params["env_params"]
                 mdp_gen_params = additional_params["mdp_generation_params"]
                 mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
-                base_env = OvercookedEnv(mdp=mdp_fn, **env_params)
+                base_env = OvercookedEnv(mdp_fn, **env_params)
             elif env_name == "Gathering-v0":
                 from gathering_ai_py.mdp.gathering_env import GatheringEnv
                 from gathering_ai_py.mdp.gathering_mdp import GatheringGridworld
