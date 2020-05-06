@@ -99,7 +99,7 @@ class PolicyWithValue(object):
 
         a, action_probs, v, state, neglogp = self._evaluate([self.action, self.action_probs, self.vf, self.state, self.neglogp], observation, **extra_feed)
         if return_action_probs:
-            return action_probs
+            return action_probs, state
         if state.size == 0:
             state = None
         return a, v, state, neglogp

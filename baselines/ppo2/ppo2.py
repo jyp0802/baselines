@@ -414,7 +414,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
 
-            from human_aware_rl.baselines_utils import get_agent_from_model
+            from human_aware_rl.ppo.ppo import PPOAgent
             
             if env_name == "Overcooked-v0":
                 from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
@@ -442,7 +442,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             print(additional_params["SAVE_DIR"])
 
             display_until = 100
-            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type == "joint_ppo"), gathering=(additional_params["ENVIRONMENT_TYPE"] == "Gathering"))
+            agent = PPOAgent.from_model(model, additional_params)
             agent.set_mdp(base_env.mdp)
 
             if not additional_params["OTHER_AGENT_TYPE"] == 'tom':  # For TOM we vizualise
@@ -456,8 +456,7 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         print("PPO agent on index 0:")
                         env.other_agent.set_mdp(base_env.mdp)
                         agent_pair = AgentPair(agent, env.other_agent)
-                        trajectory, time_taken, tot_rewards, _ = base_env.run_agents(agent_pair,
-                                                                                        display=True, display_until=100)
+                        trajectory, time_taken, tot_rewards, _ = base_env.run_agents(agent_pair, display=True, display_until=100)
                         base_env.reset()
                         agent_pair.reset()
                         print("Tot rew", tot_rewards)

@@ -24,7 +24,8 @@ class AbstractEnvRunner(ABC):
         else:
             self.obs[:] = env.reset()
         self.nsteps = nsteps
-        self.states = model.initial_state
+        self.states0 = model.initial_state
+        self.states1 = model.initial_state
         self.dones = [False for _ in range(nenv)]
 
     @abstractmethod
