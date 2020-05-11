@@ -34,7 +34,7 @@ class PolicyWithValue(object):
         """
 
         self.X = observations
-        self.state = tf.constant([])
+        self.state = tf.identity(tf.constant([]), name="state")
         self.initial_state = None
         self.__dict__.update(tensors)
 
