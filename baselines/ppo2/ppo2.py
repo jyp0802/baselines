@@ -74,9 +74,6 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     **network_kwargs:                 keyword arguments to the policy / network builder. See baselines.common/policies.py/build_policy and arguments to a particular type of network
                                       For instance, 'mlp' network architecture has arguments num_hidden and num_layers.
-
-
-
     '''
     additional_params = network_kwargs["network_kwargs"]
     from baselines import logger
