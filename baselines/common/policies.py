@@ -32,11 +32,14 @@ class PolicyWithValue(object):
         **tensors       tensorflow tensors for additional attributes such as state or mask
 
         """
-
         self.X = observations
-        self.state = tf.identity(tf.constant([]), name="state")
+        self.state = tf.constant([])
         self.initial_state = None
+        # Micah: If recurrent, tensors will include "S" and "M", that are set as 
+        # attributes here (e.g. this is where `act_model.S` is defined).
         self.__dict__.update(tensors)
+        if 'S' in tensors.keys():
+            self.S = tf.identity(tensors['S'], name="out_state")
 
         vf_latent = vf_latent if vf_latent is not None else latent
 
