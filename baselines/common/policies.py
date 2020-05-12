@@ -33,13 +33,11 @@ class PolicyWithValue(object):
 
         """
         self.X = observations
-        self.state = tf.constant([])
+        self.state = tf.constant([]) # Micah: This is a placeholder attribute, that is overwritten later (somewhere)
         self.initial_state = None
         # Micah: If recurrent, tensors will include "S" and "M", that are set as 
         # attributes here (e.g. this is where `act_model.S` is defined).
         self.__dict__.update(tensors)
-        if 'S' in tensors.keys():
-            self.S = tf.identity(self.S, name="out_state")
 
         vf_latent = vf_latent if vf_latent is not None else latent
 
@@ -99,7 +97,6 @@ class PolicyWithValue(object):
         -------
         (action, value estimate, next state, negative log likelihood of the action under current policy parameters) tuple
         """
-
         a, action_probs, v, state, neglogp = self._evaluate([self.action, self.action_probs, self.vf, self.state, self.neglogp], observation, **extra_feed)
         if return_action_probs:
             return action_probs, state
@@ -151,16 +148,29 @@ def build_policy(env, policy_network, value_network=None, normalize_observations
         encoded_x = encode_observation(ob_space, encoded_x)
 
         with tf.variable_scope('pi', reuse=tf.AUTO_REUSE):
-            policy_latent = policy_network(encoded_x)
-            if isinstance(policy_latent, tuple):
-                policy_latent, recurrent_tensors = policy_latent
+            if network_type == "cnn_lstm_overcooked": #Micah: added this so we won't have useless copies of the networks
+                # recurrent architecture, need a few more steps
+                nenv = nbatch // nsteps
+                assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(nbatch, nsteps)
 
-                if recurrent_tensors is not None:
-                    # recurrent architecture, need a few more steps
-                    nenv = nbatch // nsteps
-                    assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(nbatch, nsteps)
-                    policy_latent, recurrent_tensors = policy_network(encoded_x, nenv)
-                    extra_tensors.update(recurrent_tensors)
+                # Micah: This is where placeholders for states and masks are actually created. Note that the only difference
+                # between the networks is going to be nenv and the encoded_x shape
+                policy_latent, recurrent_tensors = policy_network(encoded_x, nenv)
+                extra_tensors.update(recurrent_tensors)
+            else:
+                policy_latent = policy_network(encoded_x)
+                if isinstance(policy_latent, tuple):
+                    policy_latent, recurrent_tensors = policy_latent
+
+                    if recurrent_tensors is not None:
+                        # recurrent architecture, need a few more steps
+                        nenv = nbatch // nsteps
+                        assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(nbatch, nsteps)
+
+                        # Micah: This is where placeholders for states and masks are actually created. Note that the only difference
+                        # between the networks is going to be nenv and the encoded_x shape
+                        policy_latent, recurrent_tensors = policy_network(encoded_x, nenv)
+                        extra_tensors.update(recurrent_tensors)
 
 
         _v_net = value_network

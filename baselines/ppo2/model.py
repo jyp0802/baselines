@@ -35,14 +35,19 @@ class Model(object):
         with tf.variable_scope(self.scope, reuse=tf.AUTO_REUSE):
             with tf.variable_scope('ppo2_model', reuse=tf.AUTO_REUSE):
                 # CREATE OUR TWO MODELS
-                # act_model that is used for sampling
+                # Micah: act_model that is used for sampling in the runner
+                # NOTE: nbatch_act is equal to the simulation threads
                 act_model = policy(nbatch_act, 1, sess)
 
-                # Train model for training
+                # Train model for training (gradient steps)
                 if microbatch_size is None:
                     train_model = policy(nbatch_train, nsteps, sess)
                 else:
                     train_model = policy(microbatch_size, nsteps, sess)
+
+        # Micah: If you want to visualize the tensorflow graph, uncomment the following line
+        # and follow the steps here https://github.com/openai/baselines/issues/596#issuecomment-422973466
+        # writer = tf.summary.FileWriter(".temp_tensorboard_data", self.sess.graph)
 
         # CREATE THE PLACEHOLDERS
         self.A = A = train_model.pdtype.sample_placeholder([None])
@@ -132,7 +137,6 @@ class Model(object):
         # TODO: Not sure what this next couple lines are doing
         global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="")
         if MPI is not None:
-            # print("NOT SURE WHAT THIS GUY IS DOING in model.py")
             sync_from_root(sess, global_variables) #pylint: disable=E1101
 
     def train(self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None):
