@@ -39,7 +39,7 @@ class PolicyWithValue(object):
         # attributes here (e.g. this is where `act_model.S` is defined).
         self.__dict__.update(tensors)
         if 'S' in tensors.keys():
-            self.S = tf.identity(tensors['S'], name="out_state")
+            self.S = tf.identity(self.S, name="out_state")
 
         vf_latent = vf_latent if vf_latent is not None else latent
 
