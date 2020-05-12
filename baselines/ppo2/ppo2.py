@@ -91,6 +91,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     else: assert callable(cliprange)
     total_timesteps = int(total_timesteps)
 
+    # Micah: returns a policy_fn (not a PolicyWithValue) with no predefined
+    # sizes yet (no tensors are defined at this step)
     policy = build_policy(env, network, **network_kwargs)
     
     bestrew = -np.Inf
