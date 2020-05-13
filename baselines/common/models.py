@@ -145,23 +145,23 @@ def cnn_lstm(nlstm=128, layer_norm=False, **conv_kwargs):
         # so basically it's all the timesteps of the minibatch.
         nbatch = X.shape[0]
         
-        # M - I believe this might always just be the size of the minibatch?
+        # Micah: I believe this might always just be the size of the minibatch?
         nsteps = nbatch // nenv
 
         h = nature_cnn(X, **conv_kwargs)
 
-        # M – the mask is just a set of zeros (or ones initially I think) for the states
+        # Micah: the mask is just a set of zeros (or ones initially I think) for the states
         # that had a "Done" at the previous timestep. This is useful because you don't want to
         # backprop the gradients in inter-episodes, but only intra-episodes.
         M = tf.placeholder(tf.float32, [nbatch]) # mask (done t-1)
         S = tf.placeholder(tf.float32, [nenv, 2*nlstm]) # states
 
-        # M – h is the number of hidden units returned by the CNN network.
+        # Micah: h is the number of hidden units returned by the CNN network.
         # Doing some transformation magic to prepare for lstm layer
         xs = batch_to_seq(h, nenv, nsteps)
         ms = batch_to_seq(M, nenv, nsteps)
 
-        # M – tensors are now of shape [nenv, steps_per_env, -1]
+        # Micah: tensors are now of shape [nenv, steps_per_env, -1]
 
         if layer_norm:
             h5, snew = utils.lnlstm(xs, ms, S, scope='lnlstm', nh=nlstm)
