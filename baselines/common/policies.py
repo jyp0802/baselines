@@ -20,22 +20,17 @@ class PolicyWithValue(object):
         Parameters:
         ----------
         env             RL environment
-
         observations    tensorflow placeholder in which the observations will be fed
-
         latent          latent state from which policy distribution parameters should be inferred
-
         vf_latent       latent state from which value function should be inferred (if None, then latent is used)
-
         sess            tensorflow session to run calculations in (if None, default session is used)
-
         **tensors       tensorflow tensors for additional attributes such as state or mask
-
         """
-
         self.X = observations
-        self.state = tf.constant([])
+        self.state = tf.constant([])  # Micah: This is a placeholder attribute, that is overwritten later (somewhere)
         self.initial_state = None
+        # Micah: If recurrent, tensors will include "S" and "M", that are set as
+        # attributes here (e.g. this is where `act_model.S` is defined).
         self.__dict__.update(tensors)
 
         vf_latent = vf_latent if vf_latent is not None else latent
@@ -66,8 +61,8 @@ class PolicyWithValue(object):
             self.vf = self.q
         else:
             self.vf = fc(vf_latent, 'vf', 1)
-            self.vf = self.vf[:,0]
-        
+            self.vf = self.vf[:, 0]
+
         self.vf = tf.identity(self.vf, name="value")
 
     def _evaluate(self, variables, observation, **extra_feed):
@@ -84,22 +79,18 @@ class PolicyWithValue(object):
     def step(self, observation, return_action_probs=False, **extra_feed):
         """
         Compute next action(s) given the observation(s)
-
         Parameters:
         ----------
-
         observation     observation data (either single or a batch)
-
         **extra_feed    additional data such as state or mask (names of the arguments should match the ones in constructor, see __init__)
-
         Returns:
         -------
         (action, value estimate, next state, negative log likelihood of the action under current policy parameters) tuple
         """
-
-        a, action_probs, v, state, neglogp = self._evaluate([self.action, self.action_probs, self.vf, self.state, self.neglogp], observation, **extra_feed)
+        a, action_probs, v, state, neglogp = self._evaluate(
+            [self.action, self.action_probs, self.vf, self.state, self.neglogp], observation, **extra_feed)
         if return_action_probs:
-            return action_probs
+            return action_probs, state
         if state.size == 0:
             state = None
         return a, v, state, neglogp
@@ -107,14 +98,10 @@ class PolicyWithValue(object):
     def value(self, ob, *args, **kwargs):
         """
         Compute value estimate(s) given the observation(s)
-
         Parameters:
         ----------
-
         observation     observation data (either single or a batch)
-
         **extra_feed    additional data such as state or mask (names of the arguments should match the ones in constructor, see __init__)
-
         Returns:
         -------
         value estimate
@@ -127,7 +114,9 @@ class PolicyWithValue(object):
     def load(self, load_path):
         tf_util.load_state(load_path, sess=self.sess)
 
-def build_policy(env, policy_network, value_network=None,  normalize_observations=False, estimate_q=False, **policy_kwargs):
+
+def build_policy(env, policy_network, value_network=None, normalize_observations=False, estimate_q=False,
+                 **policy_kwargs):
     if isinstance(policy_network, str):
         network_type = policy_network
         policy_network = get_network_builder(network_type)(**policy_kwargs)
@@ -135,7 +124,8 @@ def build_policy(env, policy_network, value_network=None,  normalize_observation
     def policy_fn(nbatch=None, nsteps=None, sess=None, observ_placeholder=None):
         ob_space = env.observation_space
 
-        X = observ_placeholder if observ_placeholder is not None else observation_placeholder(ob_space, batch_size=nbatch)
+        X = observ_placeholder if observ_placeholder is not None else observation_placeholder(ob_space,
+                                                                                              batch_size=nbatch)
 
         extra_tensors = {}
 
@@ -148,17 +138,32 @@ def build_policy(env, policy_network, value_network=None,  normalize_observation
         encoded_x = encode_observation(ob_space, encoded_x)
 
         with tf.variable_scope('pi', reuse=tf.AUTO_REUSE):
-            policy_latent = policy_network(encoded_x)
-            if isinstance(policy_latent, tuple):
-                policy_latent, recurrent_tensors = policy_latent
+            if "lstm" in network_type:
+                # Micah: added this so we won't have useless copies of the networks
+                # recurrent architecture
+                nenv = nbatch // nsteps
+                assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(nbatch,
+                                                                                                               nsteps)
 
-                if recurrent_tensors is not None:
-                    # recurrent architecture, need a few more steps
-                    nenv = nbatch // nsteps
-                    assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(nbatch, nsteps)
-                    policy_latent, recurrent_tensors = policy_network(encoded_x, nenv)
-                    extra_tensors.update(recurrent_tensors)
+                # Micah: This is where placeholders for states and masks are actually created. Note that the only difference
+                # between the networks is going to be nenv and the encoded_x shape
+                policy_latent, recurrent_tensors = policy_network(encoded_x, nenv)
+                extra_tensors.update(recurrent_tensors)
+            else:
+                policy_latent = policy_network(encoded_x)
+                if isinstance(policy_latent, tuple):
+                    policy_latent, recurrent_tensors = policy_latent
 
+                    if recurrent_tensors is not None:
+                        # recurrent architecture, need a few more steps
+                        nenv = nbatch // nsteps
+                        assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(
+                            nbatch, nsteps)
+
+                        # Micah: This is where placeholders for states and masks are actually created. Note that the only difference
+                        # between the networks is going to be nenv and the encoded_x shape
+                        policy_latent, recurrent_tensors = policy_network(encoded_x, nenv)
+                        extra_tensors.update(recurrent_tensors)
 
         _v_net = value_network
 
@@ -192,4 +197,3 @@ def _normalize_clip_observation(x, clip_range=[-5.0, 5.0]):
     rms = RunningMeanStd(shape=x.shape[1:])
     norm_x = tf.clip_by_value((x - rms.mean) / rms.std, min(clip_range), max(clip_range))
     return norm_x, rms
-
