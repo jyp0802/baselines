@@ -140,7 +140,6 @@ class Model(object):
             sync_from_root(sess, global_variables) #pylint: disable=E1101
 
     def train(self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None):
-        # print("OBSS UPDATE", obs.shape)
         # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
         # Returns = R + yV(s')
         advs = returns - values

@@ -148,8 +148,9 @@ def build_policy(env, policy_network, value_network=None, normalize_observations
         encoded_x = encode_observation(ob_space, encoded_x)
 
         with tf.variable_scope('pi', reuse=tf.AUTO_REUSE):
-            if network_type == "cnn_lstm_overcooked": #Micah: added this so we won't have useless copies of the networks
-                # recurrent architecture, need a few more steps
+            if "lstm" in network_type: 
+                # Micah: added this so we won't have useless copies of the networks
+                # recurrent architecture
                 nenv = nbatch // nsteps
                 assert nenv > 0, 'Bad input for recurrent policy: batch size {} smaller than nsteps {}'.format(nbatch, nsteps)
 
