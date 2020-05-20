@@ -143,7 +143,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     print("TOT NUM UPDATES", nupdates)
     for update in range(1, nupdates+1):
 
-        print("UPDATE {} / {}; (seed: {})".format(update, nupdates, additional_params["CURR_SEED"]))
+        print("\nUPDATE {} / {} (seed {} of EX_NAME={})\n".format(update, nupdates,
+                                                        additional_params["CURR_SEED"], additional_params["EX_NAME"]))
 
         assert nbatch % nminibatches == 0, "Have {} total batch size and want {} minibatches, can't split evenly".format(nbatch, nminibatches)
         # Start timer
