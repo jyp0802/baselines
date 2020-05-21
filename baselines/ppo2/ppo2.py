@@ -74,14 +74,11 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
     **network_kwargs:                 keyword arguments to the policy / network builder. See baselines.common/policies.py/build_policy and arguments to a particular type of network
                                       For instance, 'mlp' network architecture has arguments num_hidden and num_layers.
-
-
-
     '''
     additional_params = network_kwargs["network_kwargs"]
     from baselines import logger
 
-    # set_global_seeds(seed) We deal with seeds upstream
+    # set_global_seeds(seed) Micah: We deal with seeds upstream
 
     if "LR_ANNEALING" in additional_params.keys():
         lr_reduction_factor = additional_params["LR_ANNEALING"]
@@ -94,6 +91,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     else: assert callable(cliprange)
     total_timesteps = int(total_timesteps)
 
+    # Micah: returns a policy_fn (not a PolicyWithValue) with no predefined
+    # sizes yet (no tensors are defined at this step)
     policy = build_policy(env, network, **network_kwargs)
     
     bestrew = -np.Inf
@@ -105,8 +104,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     ac_space = env.action_space
 
     # Calculate the batch_size
-    nbatch = nenvs * nsteps
-    nbatch_train = nbatch // nminibatches
+    nbatch = nenvs * nsteps # Micah: nbatch is the total batch size. Each env simulates nsteps
+    nbatch_train = nbatch // nminibatches # Micah: the minibactch size – the agreggated batch across simulation threads is then divided into nminibatches, and gradients are computed on each of these minibatches
 
     # Instantiate the model object (that creates act_model and train_model)
     if model_fn is None:
@@ -120,6 +119,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
     if load_path is not None:
         model.load(load_path)
 
+    env_name = 'unknown' if 'env_name' not in env.__dict__.keys() else env.env_name
+    model.env_name = env_name
+    
     # Instantiate the runner object
     runner = Runner(env=env, model=model, nsteps=nsteps, gamma=gamma, lam=lam)
     if eval_env is not None:
@@ -190,6 +192,9 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                     mblossvals.append(model.train(lrnow, cliprangenow, *slices))
 
         else: # recurrent version
+            # Micah: My understanding is that the main difference lies in the randomization.
+            # We don't shuffle indices anymore within-episode, but only which envs' rollouts
+            # go in each minibatch
             assert nenvs % nminibatches == 0
             envsperbatch = nenvs // nminibatches
             envinds = np.arange(nenvs)
@@ -227,13 +232,55 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             run_info['explained_variance'].append(float(ev))
             
             eprewmean = safemean([epinfo['r'] for epinfo in epinfobuf])
-            logger.logkv('eprewmean', eprewmean)
+            logger.logkv('ep_perceived_rew_mean', eprewmean)
             run_info['ep_perceived_rew_mean'].append(eprewmean)
 
-            # ood_penalty = safemean([epinfo['ood_penalty'] for epinfo in epinfobuf])
-            # logger.logkv('ood_penalty', ood_penalty)
-            # run_info['ood_penalty'].append(ood_penalty)
+            main_agent_indices_for_info_buffers = [epinfo['policy_agent_idx'] for epinfo in epinfobuf]
+            if additional_params["ENVIRONMENT_TYPE"] == "Gathering":
+                # print(main_agent_indices_for_info_buffers)
+                # print("GAME STATS", [epinfo['ep_game_stats'] for epinfo in epinfobuf])
+                for k in epinfobuf[0]['ep_game_stats'].keys():
+                    gamestat_mean = safemean([epinfo['ep_game_stats'][k][main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_main".format(k)].append(gamestat_mean)
 
+                    gamestat_mean_other = safemean([epinfo['ep_game_stats'][k][1 - main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_other".format(k)].append(gamestat_mean_other)
+
+                    logger.logkv("_{}_main".format(k), gamestat_mean)
+                    logger.logkv("_{}_other".format(k), gamestat_mean_other)
+
+            if additional_params["ENVIRONMENT_TYPE"] == "Overcooked":
+                # Look at episode infos, find the game stats, keep track of them, and log them
+                from overcooked_ai_py.mdp.overcooked_mdp import EVENT_TYPES
+                for k in EVENT_TYPES:
+                    gamestat_mean = safemean([len(epinfo['ep_game_stats'][k][main_idx]) for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_main".format(k)].append(gamestat_mean)
+
+                    gamestat_mean_other = safemean([len(epinfo['ep_game_stats'][k][1 - main_idx]) for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_other".format(k)].append(gamestat_mean_other)
+
+                    logger.logkv("_{}_main".format(k), gamestat_mean)
+                    logger.logkv("_{}_other".format(k), gamestat_mean_other)
+
+                # Look at episode infos and look at task contribution by agent
+                for rew_type in ["sparse", "shaped"]:
+                    k = 'ep_{}_r_by_agent'.format(rew_type)
+
+                    gamestat_mean = safemean([epinfo[k][main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_r_contrib_main".format(rew_type)].append(gamestat_mean)
+                    gamestat_mean_other = safemean([epinfo[k][1 - main_idx] for main_idx, epinfo in zip(main_agent_indices_for_info_buffers, epinfobuf)])
+                    run_info["{}_r_contrib_other".format(rew_type)].append(gamestat_mean_other)
+
+                    logger.logkv("_{}_r_contrib_main".format(rew_type), gamestat_mean)
+                    logger.logkv("_{}_r_contrib_other".format(rew_type), gamestat_mean_other)
+
+
+            # TODO: agent_infos (4/23/2020 ?)
+            ood_proportion = safemean([epinfo['OTHER_OOD'] for epinfo in epinfobuf])
+            if ood_proportion != 0.5:
+                logger.logkv("_OOD_percentage_other", ood_proportion)
+                run_info['ood_other'].append(ood_proportion)
+            
             ep_dense_rew_mean = safemean([epinfo['ep_shaped_r'] for epinfo in epinfobuf])
             run_info['ep_dense_rew_mean'].append(ep_dense_rew_mean)
 
@@ -314,7 +361,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                         print("BEST REW", ep_sparse_rew_mean, "overwriting previous model with", bestrew)
                         save_ppo_model(model, "{}seed{}/best".format(
                             additional_params["SAVE_DIR"],
-                            additional_params["CURR_SEED"])
+                            additional_params["CURR_SEED"]), 
+                            additional_params
                         )
                         bestrew = max(ep_sparse_rew_mean, bestrew)
 
@@ -360,26 +408,41 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
             savepath = osp.join(checkdir, '%.5i'%update)
             print('Saving to', savepath)
             model.save(savepath)
-        
-        from overcooked_ai_py.agents.benchmarking import AgentEvaluator
+
         # Visualization of rollouts with actual other agent
         run_type = additional_params["RUN_TYPE"]
         if run_type in ["ppo", "joint_ppo"] and update % additional_params["VIZ_FREQUENCY"] == 0:
-            from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
-            from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
-            from overcooked_ai_py.agents.agent import AgentPair
-            from human_aware_rl.baselines_utils import get_agent_from_model
-            from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+
+            from human_aware_rl.ppo.ppo import PPOAgent
+            
+            if env_name == "Overcooked-v0":
+                from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+                from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
+                from overcooked_ai_py.mdp.layout_generator import LayoutGenerator
+                from overcooked_ai_py.agents.agent import AgentPair
+
+                mdp_params = additional_params["mdp_params"]
+                env_params = additional_params["env_params"]
+                mdp_gen_params = additional_params["mdp_generation_params"]
+                mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
+                base_env = OvercookedEnv(mdp_fn, **env_params)
+            elif env_name == "Gathering-v0":
+                from gathering_ai_py.mdp.gathering_env import GatheringEnv
+                from gathering_ai_py.mdp.gathering_mdp import GatheringGridworld
+                from gathering_ai_py.agents.agent import AgentPair
+
+                mdp_params = additional_params["mdp_params"]
+                env_params = additional_params["env_params"]
+                mdp_fn = lambda: GatheringGridworld.from_layout_name(**mdp_params)
+                base_env = GatheringEnv(mdp=mdp_fn, **env_params)
+            else:
+                raise ValueError("Unrecognized Env")
+
             print(additional_params["SAVE_DIR"])
 
-            mdp_params = additional_params["mdp_params"]
-            env_params = additional_params["env_params"]
-            mdp_gen_params = additional_params["mdp_generation_params"]
-            mdp_fn = LayoutGenerator.mdp_gen_fn_from_dict(mdp_params=mdp_params, **mdp_gen_params)
-            overcooked_env = OvercookedEnv(mdp=mdp_fn, **env_params)
-            agent = get_agent_from_model(model, additional_params["sim_threads"], is_joint_action=(run_type ==
-                                                                                "joint_ppo"))
-            agent.set_mdp(overcooked_env.mdp)
+            display_until = 100
+            agent = PPOAgent.from_model(model, additional_params)
+            agent.set_mdp(base_env.mdp)
 
             if not additional_params["OTHER_AGENT_TYPE"] == 'tom':  # For TOM we vizualise
                 # and also evaluate the performance of the ppo with various agents in section "if update % log_interval"
@@ -390,11 +453,10 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
 
                     else:
                         print("PPO agent on index 0:")
-                        env.other_agent.set_mdp(overcooked_env.mdp)
+                        env.other_agent.set_mdp(base_env.mdp)
                         agent_pair = AgentPair(agent, env.other_agent)
-                        trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair,
-                                                                                        display=True, display_until=100)
-                        overcooked_env.reset()
+                        trajectory, time_taken, tot_rewards, _ = base_env.run_agents(agent_pair, display=True, display_until=100)
+                        base_env.reset()
                         agent_pair.reset()
                         print("Tot rew", tot_rewards)
 
@@ -404,8 +466,8 @@ def learn(*, network, env, total_timesteps, early_stopping = False, eval_env = N
                 else:
                     agent_pair = AgentPair(agent)
 
-                trajectory, time_taken, tot_rewards, _ = overcooked_env.run_agents(agent_pair, display=True, display_until=100)
-                overcooked_env.reset()
+                trajectory, time_taken, tot_rewards, _ = base_env.run_agents(agent_pair, display=True, display_until=100)
+                base_env.reset()
                 agent_pair.reset()
                 print("tot rew", tot_rewards)
 

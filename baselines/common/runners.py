@@ -10,7 +10,8 @@ class AbstractEnvRunner(ABC):
         self.obs = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
 
         overcooked = 'env_name' in env.__dict__.keys() and env.env_name == "Overcooked-v0"
-        if overcooked:
+        gathering = 'env_name' in env.__dict__.keys() and env.env_name == "Gathering-v0"
+        if overcooked or gathering:
             self.obs0 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
             self.obs1 = np.zeros((nenv,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
 
@@ -18,12 +19,13 @@ class AbstractEnvRunner(ABC):
             both_obs = obs["both_agent_obs"]
             self.obs0[:] = both_obs[:, 0, :, :]
             self.obs1[:] = both_obs[:, 1, :, :]
-            self.curr_state = obs["overcooked_state"]
+            self.curr_state = obs["overcooked_state"] if overcooked else obs["gathering_state"]
             self.other_agent_idx = obs["other_agent_env_idx"]
         else:
             self.obs[:] = env.reset()
         self.nsteps = nsteps
-        self.states = model.initial_state
+        self.states0 = model.initial_state
+        self.states1 = model.initial_state
         self.dones = [False for _ in range(nenv)]
 
     @abstractmethod
