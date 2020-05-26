@@ -66,10 +66,6 @@ class Runner(AbstractEnvRunner):
                             if bc_choice not in other_agent_choices:
                                 self.env.other_agent[i] = self.env.bc_agent_store[bc_choice]
                                 self.env.other_agent[i].reset()
-                                #TODO: Remove these (they are included below now)
-                                # self.env.other_agent[i].states_for_bc = []
-                                # self.env.other_agent[i].player_idx_for_bc = []
-                                # self.env.other_agent[i].parallel_idx_for_bc = []
                             else:
                                 pass
                             other_agent_choices.append(bc_choice)
@@ -83,16 +79,15 @@ class Runner(AbstractEnvRunner):
                             other_agent_choices.append("BC0")
                         elif i < self.env.num_envs/2 and self.env.bc_pop_size > 1:
                             # For the first half of envs, make BCs (if there's more than one BC):
-                            bc_to_choose = np.random.randint(0, self.env.bc_pop_size)
-                            # If we've already taken this BC from the store, then make a deepcopy:
+                            bc_choice = np.random.randint(0, self.env.bc_pop_size)
+                            # Only set the other_agent[i] if this BC hasn't been chosen yet -- if it has been chosen then we'll just give this BC choice it's own history, but use the same agent
+                            if bc_choice not in other_agent_choices:
+                                self.env.other_agent[i] = self.env.bc_agent_store[bc_choice]
+                                self.env.other_agent[i].reset()
+                            else:
+                                pass
+                            other_agent_choices.append(bc_choice)
 
-                            if bc_to_choose in other_agent_choices:
-                                self.env.other_agent[i] = copy.deepcopy(self.env.bc_agent_store[bc_to_choose])
-                            else:  # Otherwise it's fine to use the agent in the store directly
-                                self.env.other_agent[i] = self.env.bc_agent_store[bc_to_choose]
-                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
-                            self.env.other_agent[i].reset()
-                            other_agent_choices.append(bc_to_choose)
                         elif i >= self.env.num_envs/2:
                             # Make a TOM agent:
                             from human_aware_rl.ppo.ppo_pop import make_tom_agent
@@ -100,7 +95,7 @@ class Runner(AbstractEnvRunner):
                             tom_params_choice = self.env.other_agent[i].set_tom_params(self.env.num_toms,
                                                                                        self.other_agent_idx[i],
                                                                                        self.env.tom_params)
-                            tom_this_env[i] = 1
+                            tom_this_env[i] = 1  # Just needed for the special case of a 1-tom & 1-bc population
                             other_agent_choices.append(tom_params_choice)
 
             #TODO: Special case: bc with pop_size=1. This should be extended to pop_size>1 and incorporated into above
@@ -116,12 +111,59 @@ class Runner(AbstractEnvRunner):
 
         from overcooked_ai_py.mdp.actions import Action
 
+        # Helper functions for choosing other agents' actions:
+        def find_tom_action(env_idx):
+            """Find TOM action for parallel env with index env_idx"""
+            # TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes). (Also change this above for tom_bc pop)
+            if self.env.other_agent[env_idx].agent_index != self.other_agent_idx[env_idx]:
+                self.env.other_agent[env_idx].set_agent_index(self.other_agent_idx[env_idx])
+            action, _ = self.env.other_agent[env_idx].action(self.curr_state[env_idx])
+            action_index = Action.ACTION_TO_INDEX[action]
+            return action_index
+
+        def find_bc_actions(num_bc_envs, sp_envs_bools, other_agent_choices):
+            # Find BC actions for all parallel envs up to num_bc_envs. This is used for BC populations, in which case num_bc_envs=self.env.num_envs,
+            # but also mixed TOM-BC populations, in which case num_bc_envs=self.env.num_envs/2 <-- i.e. we only take BC actions for the first half of envs.
+            # Set up the BCs so that they can be called with several states in parallel:
+            bcs_to_call = []
+            for i in range(num_bc_envs):
+                if not sp_envs_bools[i]:
+                    bc_choice = other_agent_choices[i]
+                    if bc_choice not in bcs_to_call:
+                        bcs_to_call.append(bc_choice)
+                        self.env.other_agent[i].states_for_bc = [self.curr_state[i]]
+                        self.env.other_agent[i].player_idx_for_bc = [self.other_agent_idx[i]]
+                        self.env.other_agent[i].parallel_idx_for_bc = [i]
+                    else:
+                        # BC has already been allocated a parallel env:
+                        bcs_to_call.append(None)
+                        bc_env_idx = other_agent_choices.index(
+                            bc_choice)  # This identifies the parallel env index for this agent
+                        self.env.other_agent[bc_env_idx].states_for_bc.append(self.curr_state[i])
+                        self.env.other_agent[bc_env_idx].player_idx_for_bc.append(self.other_agent_idx[i])
+                        self.env.other_agent[bc_env_idx].parallel_idx_for_bc.append(i)
+
+            all_action_indices = []
+            # Now find the actions:
+            for i in range(len(bcs_to_call)):
+                if bcs_to_call[i] is not None:
+                    bc_env_idx = other_agent_choices.index(bcs_to_call[i])
+                    actions_and_probs = self.env.other_agent[bc_env_idx].actions(
+                        self.env.other_agent[bc_env_idx].states_for_bc,
+                        self.env.other_agent[bc_env_idx].player_idx_for_bc,
+                        self.env.other_agent[bc_env_idx].parallel_idx_for_bc)
+                    action_indices = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in
+                                      range(len(self.env.other_agent[bc_env_idx].states_for_bc))]
+                    all_action_indices.append(action_indices)
+
+            return all_action_indices, bcs_to_call
+
         def get_other_agent_actions(sp_envs_bools):
             """Get actions for the other agent. If the agent is BC or TOM, then only get actions for envs that aren't being used for self-play"""
 
             other_agent_actions = []
 
-            #TODO: Special case: bc with pop_size=1. This should be extended to pop_size>1 and incorporated into below
+            #TODO: Special case: bc with pop_size=1. This should be incorporated into >! BCs below
             if self.env.other_agent_type in ["bc_pop", "tom_bc"] and self.env.bc_pop_size == 1:
 
                 # Find only the states (& indices) for the envs with BCs in:
@@ -152,40 +194,9 @@ class Runner(AbstractEnvRunner):
                         other_agent_actions.append(bc_action_indices.pop(0))
                 return other_agent_actions
 
-            #TODO: MERGE WITH 1 BC ABOVE!
             elif self.env.other_agent_type == "bc_pop" and self.env.bc_pop_size > 1:
 
-                # Set up the BCs so that they can be called with several states in parallel:
-                bcs_to_call = []
-                for i in range(self.env.num_envs):
-                    if not sp_envs_bools[i]:
-                        bc_choice = other_agent_choices[i]
-                        if bc_choice not in bcs_to_call:
-                            bcs_to_call.append(bc_choice)
-                            self.env.other_agent[i].states_for_bc=[self.curr_state[i]]
-                            self.env.other_agent[i].player_idx_for_bc=[self.other_agent_idx[i]]
-                            self.env.other_agent[i].parallel_idx_for_bc=[i]
-                        else:
-                            # BC has already been allocated a parallel env:
-                            bcs_to_call.append(None)
-                            bc_env_idx = other_agent_choices.index(bc_choice)  # This identifies the parallel env index for this agent
-                            self.env.other_agent[bc_env_idx].states_for_bc.append(self.curr_state[i])
-                            self.env.other_agent[bc_env_idx].player_idx_for_bc.append(self.other_agent_idx[i])
-                            self.env.other_agent[bc_env_idx].parallel_idx_for_bc.append(i)
-
-                all_action_indices = []
-                # Now find the actions:
-                for i in range(len(bcs_to_call)):
-                    if bcs_to_call[i] is not None:
-                        bc_env_idx = other_agent_choices.index(bcs_to_call[i])
-                        actions_and_probs = self.env.other_agent[bc_env_idx].actions(
-                                                                self.env.other_agent[bc_env_idx].states_for_bc,
-                                                                self.env.other_agent[bc_env_idx].player_idx_for_bc,
-                                                                self.env.other_agent[bc_env_idx].parallel_idx_for_bc)
-                        action_indices = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in
-                                                        range(len(self.env.other_agent[bc_env_idx].states_for_bc))]
-                        all_action_indices.append(action_indices)
-
+                all_action_indices, bcs_to_call = find_bc_actions(self.env.num_envs, sp_envs_bools, other_agent_choices)
                 all_action_indices_marker = [i for i in bcs_to_call if i != None]  # This says which bcs correspond to which all_action_indices entry
                 # Now fill other_agent_actions with all the actions, in the correct order:
                 for i in range(self.env.num_envs):
@@ -198,46 +209,39 @@ class Runner(AbstractEnvRunner):
                         other_agent_actions.append(all_action_indices[idx_of_this_bcs_actions].pop(0))
                 return other_agent_actions
 
+            elif self.env.other_agent_type in ["tom_bc"]:
+                # For the first half of the parallel envs take actions from BCs. For the second half take actions from TOMs.
+                bc_action_indices, bcs_to_call = find_bc_actions(int(self.env.num_envs/2), sp_envs_bools, other_agent_choices)  # NOTE: We are assuming that the BCs occupy the first half of the parallel envs
+                bc_action_indices_marker = [i for i in bcs_to_call if i != None]  # This says which bcs correspond to
+                # which all_action_indices entry. Now fill other_agent_actions with all the actions, in the correct order:
 
-                # Find only the states (& indices) for the envs with BCs in:
-                states_for_bc, player_idx_for_bc, parallel_idx_for_bc = [], [], []
-                for i in range(self.env.num_envs):
-                    if not sp_envs_bools[i]:
-                        states_for_bc.append(self.curr_state[i])
-                        player_idx_for_bc.append(self.other_agent_idx[i])
-                        parallel_idx_for_bc.append(self.env.other_agent[0].parallel_indices[i])
-
-                # Get all actions for the reduced list of states:
-                actions_and_probs = self.env.other_agent[0].actions(states_for_bc, player_idx_for_bc, parallel_idx_for_bc)
-                action_indices = [Action.ACTION_TO_INDEX[actions_and_probs[i][0]] for i in range(len(states_for_bc))]
-
+                # Now sort the BC actions into the right order for other_agent_actions; then find the TOM actions for the second half of the envs
                 for i in range(self.env.num_envs):
                     if sp_envs_bools[i]:
                         other_agent_actions.append(None)
-                    else:
-                        # Append others actions with the first action from the action_indices list
-                        other_agent_actions.append(action_indices.pop(0))
+                    elif i < self.env.num_envs/2:
+                        # Extract BC actions from bc_action_indices
+                        bc_idx = other_agent_choices[i]
+                        idx_of_this_bcs_actions = bc_action_indices_marker.index(bc_idx)
+                        # Append others actions with the first action from the corresponding action_indices list
+                        other_agent_actions.append(bc_action_indices[idx_of_this_bcs_actions].pop(0))
+
+                    elif i >= self.env.num_envs/2:
+                        # Find TOM action:
+                        action_index = find_tom_action(i)  # Find TOM action for the i'th env
+                        other_agent_actions.append(action_index)
+
                 return other_agent_actions
-
-            #TODO: REMOVE BC FROM THIS:
-            elif self.env.other_agent_type in ["bc_pop", "tom", "tom_bc"]:
-
+            
+            elif self.env.other_agent_type in ["tom"]:
                 # We have SIM_THREADS parallel other_agents. The i'th takes curr_state[i], and returns an action
                 for i in range(self.env.num_envs):
-
                     # Only get actions for envs that aren't being used for self-play
                     if sp_envs_bools[i]:
                         other_agent_actions.append(None)
                     else:
-                        #TODO: This is needed because if batch size = n*horizon for n>1, then after one epsiode the index
-                        # might be switched. Adding this here is just a quick fix, and should be fixed at the source (i.e. when the index changes). (Also change this above for tom_bc pop)
-                        if self.env.other_agent[i].agent_index != self.other_agent_idx[i]:
-                            self.env.other_agent[i].set_agent_index(self.other_agent_idx[i])
-
-                        action, _ = self.env.other_agent[i].action(self.curr_state[i])
-                        action_index = Action.ACTION_TO_INDEX[action]
+                        action_index = find_tom_action(i)  # Find TOM action for the i'th env
                         other_agent_actions.append(action_index)
-
                 return other_agent_actions
 
             else:   #TODO: This shouldn't be "else", because this won't work for all agent types
