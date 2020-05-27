@@ -43,6 +43,7 @@ class Runner(AbstractEnvRunner):
         #                                               replace=False))
 
         # For TOM/BC agents, set the personality params / choose the BC for each parallel agent for this trajectory
+        #TODO: Put this whole "if" into a helper function!
         if self.env.run_type is "ppo" and self.env.other_agent_type in ["bc_pop", "tom", "tom_bc"]:
             other_agent_choices = []
             tom_this_env = [0]*self.env.num_envs
