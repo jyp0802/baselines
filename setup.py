@@ -33,7 +33,7 @@ setup(name='baselines',
                 if package.startswith('baselines')],
       install_requires=[
           'gym',
-          'scipy',
+          'scipy==1.7.3',
           'tqdm',
           'joblib',
           'dill',
